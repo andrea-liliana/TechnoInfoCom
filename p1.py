@@ -1,3 +1,4 @@
+import csv
 import numpy as np
 
 
@@ -100,6 +101,22 @@ if __name__ == "__main__":
         "Itching" : ["yes", "no"],
         "Jaundice" : ["yes", "no"] }
 
+    with open('P1_medicalDB.csv') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            print(row)
+
     for k,v in PARAMS.items():
         ent = entropy( np.ones((1,len(v))) / len(v))
         print(f"{k} : {ent}")
+
+    v = PARAMS["Disease"]
+    X = np.ones((1,len(v))) / len(v)
+
+    for k,v in PARAMS.items():
+        if k != "Disease":
+            # X = disease; Y=other variable
+            Y = np.ones((1,len(v))) / len(v)
+            conditional_entropy(X_given_Y, Y)
+            ent = entropy( np.ones((1,len(v))) / len(v))
+            print(f"{k} : {ent}")
