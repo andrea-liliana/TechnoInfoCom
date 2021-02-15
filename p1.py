@@ -80,3 +80,21 @@ if __name__ == "__main__":
     Y = np.array([0.5, 0.5])
     X_and_Y = np.array([[0.25, 0.25], [0.25, 0.25]])
     print(mutual_information(X, Y, X_and_Y))
+
+    PARAMS = {
+        "Age" : ["<40", ">40"],
+        "Sex" : ["man", "woman"],
+        "Obesity" : ["thin","regular","overweight"],
+        "Alcoholic antecedents" : ["yes", "no"],
+        "Iron" : ["low", "normal", "high", "very high"],
+        "Disease" : ["healthy", "PBC", "steatosis"],
+        "Fatigue" : ["yes", "no"],
+        "Triglycerides" : ["abnormal", "normal"],
+        "Alanine transaminase" : ["abnormal", "normal"],
+        "Aspartate transaminase" : ["abnormal", "normal"],
+        "Gamma-glutamyl transpeptidase" : ["abnormal", "normal"],
+        "CholesterolCHL" : ["low", "normal", "high"],
+        "Anti-mitochondrial antibody" : ["yes", "no"],
+        "Muscular ache" : ["yes", "no"],
+        "Bilirubin" : ["abnormal", "normal"]
+    }
