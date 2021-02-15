@@ -96,5 +96,10 @@ if __name__ == "__main__":
         "CholesterolCHL" : ["low", "normal", "high"],
         "Anti-mitochondrial antibody" : ["yes", "no"],
         "Muscular ache" : ["yes", "no"],
-        "Bilirubin" : ["abnormal", "normal"]
-    }
+        "Bilirubin" : ["abnormal", "normal"],
+        "Itching" : ["yes", "no"],
+        "Jaundice" : ["yes", "no"] }
+
+    for k,v in PARAMS.items():
+        ent = entropy( np.ones((1,len(v))) / len(v))
+        print(f"{k} : {ent}")
