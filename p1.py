@@ -120,3 +120,23 @@ if __name__ == "__main__":
             conditional_entropy(X_given_Y, Y)
             ent = entropy( np.ones((1,len(v))) / len(v))
             print(f"{k} : {ent}")
+
+    """
+    Question 12
+    ===========
+
+
+    a RxC matrix
+    there are M mines M < RxC
+    sart of the game : no field revealed.
+
+    So, each field has a probability of p_1_i_j = M/(RxC) of having a mine in it.
+    So entropy of a field = - log2 p_1_i_j = - log2 M/(RxC)
+
+
+    Question 13
+    ===========
+
+
+
+    """
