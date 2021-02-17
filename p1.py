@@ -44,6 +44,7 @@ def conditional_entropy(X_given_Y, Y):
     return - np.sum(X_given_Y * z * np.log2(X_given_Y))
 
 
+
 def mutual_information(X, Y, X_and_Y):
     """
     I(X;Y) = H(X) + H(Y) - H(X,Y) (See wikipedia)
@@ -58,6 +59,25 @@ def mutual_information(X, Y, X_and_Y):
     assert Y.shape[0] == X_and_Y.shape[1]
 
     return entropy(X) + entropy(Y) - joint_entropy(X_and_Y)
+
+
+def joint_entropy2(X,Y,Z):
+    probability = []
+    for x1 in set(X):
+        for x2 in set(Y):
+            for x3 in set(Z):
+                probability.append(np.mean(np.logical_and(X == x1, Y == x2, Z==x3)))
+
+    return np.sum(-p * np.log2(p) for p in probability)
+
+def cond_mutual_information():
+    """
+    I(X,Y|Z) = H(X,Z)+ H(Y,Z) - H(Z) - H(X,Y,Z)
+    H(X,Y,Z) = H(X,Y|Z)+H(Z)
+    H(X,Y|Z) = H(X|Z) + H(Y|X,Z)
+    """
+    return joint_entropy(X_and_Z) + joint_entropy(Y_and_Z) - entropy(Z) - joint_entropy2(X,Y,Z)
+
 
 
 if __name__ == "__main__":
