@@ -70,7 +70,7 @@ def joint_entropy2(X,Y,Z):
 
     return np.sum(-p * np.log2(p) for p in probability)
 
-def cond_mutual_information():
+def cond_mutual_information(X_and_Z, Y_and_Z, X, Y, Z):
     """
     I(X,Y|Z) = H(X,Z)+ H(Y,Z) - H(Z) - H(X,Y,Z)
     H(X,Y,Z) = H(X,Y|Z)+H(Z)
