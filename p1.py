@@ -78,6 +78,13 @@ def cond_mutual_information(X_and_Z, Y_and_Z, X, Y, Z):
     """
     return joint_entropy(X_and_Z) + joint_entropy(Y_and_Z) - entropy(Z) - joint_entropy2(X,Y,Z)
 
+def cond_joint_entropy(X,Y,Z):
+    """
+    H(X,Y|Z) this term is obtained here: H(X,Y,Z) = H(X,Y|Z)+H(Z)
+    H(X,Y|Z) = H(X,Y,Z) - H(Z)
+    """
+    return joint_entropy2(X,Y,Z) - entropy(Z)
+
 
 
 if __name__ == "__main__":
