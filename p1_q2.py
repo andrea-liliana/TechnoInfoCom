@@ -13,9 +13,9 @@ if __name__ == "__main__":
 
     # One column at a time
     for cname in df:
-        # Count each value appear in the column and
-        # divide to get its proportion, that is,
-        # its probabiliyt
+
+        # Count how many times each value appears in the column and
+        # divide to get its proportion, that is, its probability
 
         a = df[cname].value_counts() / len(df)
 
@@ -24,11 +24,11 @@ if __name__ == "__main__":
             a.to_dict())
 
     # Compute the joint probability on each *row*
-    # by multiplyin all rows together.
+    # by multiplying all columns together.
     proba['joint'] = proba.product(axis=1)
 
-    # Clean values so we have a proabability distribution
-    # (ie all probabilities sum to one)
+    # Clean values so we have a probability distribution
+    # (i.e. all probabilities sum to one)
     proba['joint'] = proba['joint'] / proba['joint'].sum()
 
     print(proba['joint'].sum())
