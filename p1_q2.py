@@ -69,17 +69,50 @@ if __name__ == "__main__":
         # For example : P(D=steatose, X=age>40)
 
         for gname, size in df.groupby(['DIS', vname]).size().items():
-            #print(f"{gname[0]}:{dc[gname[0]]:.3f} * {gname[1]}:{vc[gname[1]]:.3f}")
-            #print(f"{gname} {size}")
+
 
             p_dis_x = size / len(df)
             p_dis = prob_dis[gname[0]]
             h += - p_dis_x * np.log2(p_dis_x / p_dis)
 
-        print(f"H(D|{vname}) = {h:.3f}")
+            print(f"P({gname[0]},{gname[1]}) = {p_dis_x}")
+
+        print(f"H(D|{vname}) = {h:.3f}\n")
 
     """
+    H(D)=0.897 (see question 6)
     For JAU (jaundice; yes/no), H(DIS|Jaundice) = 0.334
     For BIL (bilirunine; yes/no), H(DIS|Bilirubine) = 0.239
+
+    If one knows a person has jaundice, the we will be less suprised
+    when we will discover its disease.
+    If one knows a person has bilirubine, the we will be even less
+    suprised when we will discover its disease.
+
+    So bilirubine tells more about the disease then the jaundice.
+    If I know the BIL of someone, then I'll be able to better
+    determine its DIS (better than if I know about its jaundice).
+
+    FIXME : In the disease values, thre's the "healthy" part.
+            How do we analyse that ?
+
+    H(D|JAU) = 0.334, from probabilites :
+
+    P(PBC,no) = 0.067
+    P(PBC,yes) = 0.066
+    P(healthy,no) = 0.7755 => healthy, without jaundice are most frequent
+    P(healthy,yes) = 0.027
+    P(steatosis,no) = 0.058
+    P(steatosis,yes) = 0.0065
+
+
+    H(D|BIL) = 0.239, from probabilites :
+
+    P(PBC,normal) = 0.054
+    P(PBC,abnormal) = 0.079
+    P(healthy,normal) = 0.7915
+    P(healthy,abnormal) = 0.011
+    P(steatosis,normal) = 0.0595
+    P(steatosis,abnormal) = 0.005
 
     """
