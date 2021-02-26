@@ -76,13 +76,38 @@ def joint_entropy2(P) #X_and_Y_and_Z):
     only if X ⊥ Y ⊥ Z. No ?
 
 
-    P(X,Y,Z) =
+    P(X,Y,Z) = (joint probabilities)
 
       X     Y      Z       P(X and Y and Z)
     -----------------------------------------
       true  false  true    0.1
       false false  true   0.05
       ...
+
+    DIS             X          Y       P(DIS,X,Y)
+    ---------------------------------------------
+    steatose        age>40     sdfsd    0.01
+    steatose        age>40     dddd     0.01
+    healthy         age>40     sdf      0.02
+    PBC             age<40    sdfdsf    0.1
+    steatos         ....       ...      ....
+    PBC
+    PBC
+    ...
+
+
+    DIS             X          Y       P(DIS,X,Y)
+    ---------------------------------------------
+    steatose        age>40
+                               sdfsd    0.01
+                               dddd     0.01
+
+
+    DIS             X          Y       P(DIS,X,Y)
+    ---------------------------------------------
+    steatose        age>40     -----    0.01+0.01=0.02
+
+
 
 
     P(Z) = sum_X sum_Y P(...)

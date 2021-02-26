@@ -36,8 +36,15 @@ if __name__ == "__main__":
 
     # Question 6 -----------------------------------------------------
 
-    """ Entropy of a variable X is - sum p_i log p_i where p_i is the
-    probability of the variable to have value X_i """
+    """ Entropy of a variable X = - sum p_i log p_i where p_i is the
+    probability of the variable to have value X_i
+
+    In general, the more possibilities for a given variable, the more
+    uncertainty, that is, entropy.
+
+    Why is it true ?
+
+    """
 
     for cname in sorted(df.columns):
         vc = df[cname].value_counts(normalize=True)
@@ -49,30 +56,44 @@ if __name__ == "__main__":
 
     """ H( D | X) = sum p(d,x) log p(d,x) / p(d)
     where D and X are r.v.
+
+    Should we compute H(D == healthy | X)
+    OR should we compute H(D | X) ?
+    answer = H(D | X)
+
+
     """
 
-    # All variables, not the disease
+    # All variables names, without the disease
     vnames = set(list(df.columns)) - set(['DIS'])
 
-    # Compute probabilities of each value of the disease r.v.
+    # Compute probabilities of each value of the disease r.v. DIS
     prob_dis = df['DIS'].value_counts(normalize=True).to_dict()
 
     for vname in sorted(vnames):  # list(sorted(vnames))[5:6]:
 
         h = 0
 
-        # Compute for all combination of values of the r.v. D and X
-        # For each of the combinatin, count how many times it
-        # appears in the dataset. Dividing by the size of the data
-        # set, we obtain the probability for that combination, that
-        # is a joint probability : P(D=d_i, X=x_j).
-        # For example : P(D=steatose, X=age>40)
+        # Find all combinations of values of the r.v. DIS and X For
+        # each of the combination, count how many times it appears in
+        # the dataset.  Dividing by the size of the data set, we
+        # obtain the probability for that combination, that is a joint
+        # probability : P(D=d_i, X=x_j).  For example : P(D=steatose,
+        # X=age>40)
 
         for gname, size in df.groupby(['DIS', vname]).size().items():
 
-
+            # Compute P(DIS,X)
             p_dis_x = size / len(df)
+
+            # Compute P(DIS = ...), for example P(DIS == steatosis)
+
+            # P(DIS) = # persons with steatosis OR PBC / # persons
+
+            # FIXME most prbably a bug !
             p_dis = prob_dis[gname[0]]
+
+            # Compute H(DIS | X)
             h += - p_dis_x * np.log2(p_dis_x / p_dis)
 
             print(f"P({gname[0]},{gname[1]}) = {p_dis_x}")
@@ -80,18 +101,37 @@ if __name__ == "__main__":
         print(f"H(D|{vname}) = {h:.3f}\n")
 
     """
-    H(D)=0.897 (see question 6)
-    For JAU (jaundice; yes/no), H(DIS|Jaundice) = 0.334
-    For BIL (bilirunine; yes/no), H(DIS|Bilirubine) = 0.239
+    H(DIS)=0.897 (see question 6)
 
-    If one knows a person has jaundice, the we will be less suprised
-    when we will discover its disease.
+
+    *** For JAU (jaundice; yes/no),   H(DIS|Jaundice) = 0.334
+
+    If we test for Jaundice(yes or no), then the result of a test for the
+    disase (steatosis or pbc or healthy) will be more certain.
+
+    NOT THE SAME AS : If someone HAS jaundice, then it's more probable
+    that he has a disease.
+
+
+    *** For BIL (bilirunine; yes/no), H(DIS|Bilirubine) = 0.239
+
+    If we test for Bilirubine(yes or no), then the result of a test
+    for the disase (steatosis or pbc or healthy) will be more certain.
+
+
+    If one knows a person has jaundice, then one will be less suprised
+    when one will discover its disease.
+
+
+
+
     If one knows a person has bilirubine, the we will be even less
     suprised when we will discover its disease.
 
-    So bilirubine tells more about the disease then the jaundice.
-    If I know the BIL of someone, then I'll be able to better
-    determine its DIS (better than if I know about its jaundice).
+    So testing for bilirubine tells more about the disease than
+    testing jaundice.  If I know the BIL of someone, then I'll be able
+    to better determine its DIS (better than if I know about its
+    jaundice).
 
     FIXME : In the disease values, thre's the "healthy" part.
             How do we analyse that ?
