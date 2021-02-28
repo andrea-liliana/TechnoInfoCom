@@ -73,14 +73,15 @@ def test_pandas():
                           [False, 0.7]],
                          columns=["Y", "P(Y)"])
 
-    # Compute the entropy
+    # ----------------------------------------------------------------
+    # Compute the conditional entropy
 
-    # Firs, relate P(X_i|Y_j) to P(Y_j)
+    # First, relate P(X_i|Y_j) to P(Y_j)
     r = pandas.merge(x_given_y, y)
     cond_entropy = - np.sum(r["P(X|Y)"] * r["P(Y)"] * np.log2(r["P(X|Y)"]))
 
+    # ----------------------------------------------------------------
     # Compute mutual information
-
 
     # Remember, we don't know if X and Y are
     # conditionally independent
@@ -104,7 +105,33 @@ def test_pandas():
 
     mutual_information = h(p_x) + h(p_y) - h(x_and_y['P(X^Y)'])
 
+    # ----------------------------------------------------------------
+    # Compute joint entropy
 
+    x_and_y_and_z = pandas.DataFrame(
+        [[True, True, True, 0.25],
+         [True, True, False, 0.25],
+         [True, False, True, 0.2],
+         [True, False, False, 0.3],
+         [False, True, True, 0.25],
+         [False, True, False, 0.25],
+         [False, False, True, 0.2],
+         [False, False, False, 0.3]],
+        columns=["X", "Y", "Z", "P(X^Y^Z)"])
+
+    joint_entropy = h(x_and_y_and_z["P(X^Y^Z)"])
+
+    # ----------------------------------------------------------------
+    # I(X,Y|Z) = H(X,Z)+ H(Y,Z) - H(Z) - H(X,Y,Z)
+
+    # Compute intermediate results by marginalization
+    x_and_z = x_and_y_and_z.groupby(["X","Z"]).agg(p_xz=('P(X^Y^Z)', 'sum')).reset_index()['p_xz']
+
+    y_and_z = x_and_y_and_z.groupby(["Y","Z"]).agg(p_yz=('P(X^Y^Z)', 'sum')).reset_index()['p_yz']
+
+    z = x_and_y_and_z.groupby("Z").agg(p_z=('P(X^Y^Z)', 'sum')).reset_index()['p_z']
+
+    cond_information = h(x_and_z) + h(y_and_z) - h(z) - h(x_and_y_and_z['P(X^Y^Z)'])
 
 def mutual_information(X, Y, X_and_Y):
     """
