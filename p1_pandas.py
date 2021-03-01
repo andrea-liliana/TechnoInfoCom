@@ -18,8 +18,12 @@ def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
     r['summed'] /= r['summed'].sum()
 
     if not leave_values:
+        # Only return probabilities, not a whole
+        # contingency table
         return r['summed']
     else:
+        # Return a fulle contingency table, with
+        # nice colums headers.
         if type(variables) == str:
             p_name = f"P({variables})"
         else:
