@@ -61,6 +61,10 @@ def cond_entropy2(x_given_y, y):
 def mutual_information(x_and_y, var_x="X", var_y="Y"):
     # I(X;Y) = H(X) + H(Y) - H(X,Y) (See wikipedia)
 
+    # The code here is a bit more dynamic so we can
+    # use this function in part 1 and 2 of the
+    # problem statement.
+
     x = marginalize(x_and_y, var_x)
     y = marginalize(x_and_y, var_y)
     p_x_and_y = x_and_y[x_and_y.columns[-1]]  # last column is the probabilities
@@ -87,23 +91,6 @@ def cond_information3(x_and_y_and_z):
     z = marginalize(x_and_y_and_z, "Z")
 
     return entropy(x_and_z) + entropy(y_and_z) - entropy(z) - entropy(x_and_y_and_z['P(X^Y^Z)'])
-
-
-def cond_entropy2b(x_and_y, variable):
-    """ Compute the conditional entropy based on *joint*
-    probability table.
-
-    Slide 3, course 2 : H(X|Y) = − Σ Σ P(Xi ∩ Yj) log P(Xi | Yj)
-    Applying P(a|b) = P(a,b) / P(b), we get :
-    H(X|Y) = − Σ Σ P(Xi ∩ Yj) log P(Xi ∩ Yj) / P(Yj)
-    """
-
-    join_p_column = x_and_y.columns[-1]
-
-    y = marginalize(x_and_y, variable)
-    r = pd.merge(x_and_y, y)
-
-    return - np.sum(x_and_y[join_p_column] * np.log2(r[join_p_column] / y))
 
 
 def implementation():
