@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
     """
@@ -14,7 +16,8 @@ def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
     """
 
     p_column = dist_table.columns[-1]
-    r = dist_table.groupby(variables).agg(summed=(p_column, 'sum')).reset_index()
+    r = dist_table.groupby(variables).agg(
+        summed=(p_column, 'sum')).reset_index()
     r['summed'] /= r['summed'].sum()
 
     if not leave_values:
@@ -31,6 +34,7 @@ def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
         r.rename(columns={'summed': p_name}, inplace=True)
         return r
 
+
 def entropy(probabilities):
     """
     Computes H(X)
@@ -45,12 +49,12 @@ def entropy(probabilities):
     return - np.sum(non_zero * np.log2(non_zero))
 
 
-def joint_entropy2(x_and_y):
+def joint_entropy(x_and_y):
     # Compute the joint entropy
     return entropy(x_and_y["P(X^Y)"])
 
 
-def cond_entropy2(x_given_y, y):
+def cond_entropy(x_given_y, y):
     # Compute the conditional entropy
 
     # First, relate P(X_i|Y_j) to P(Y_j)
@@ -67,7 +71,8 @@ def mutual_information(x_and_y, var_x="X", var_y="Y"):
 
     x = marginalize(x_and_y, var_x)
     y = marginalize(x_and_y, var_y)
-    p_x_and_y = x_and_y[x_and_y.columns[-1]]  # last column is the probabilities
+    # last column is the probabilities
+    p_x_and_y = x_and_y[x_and_y.columns[-1]]
 
     return entropy(x) + entropy(y) - entropy(p_x_and_y)
 
@@ -77,13 +82,7 @@ def joint_entropy3(x_and_y_and_z):
     return entropy(x_and_y_and_z["P(X^Y^Z)"])
 
 
-def cond_entropy3(x_and_y_and_z):
-    # H(X,Y|Z) = H(X,Y,Z) - H(Z) (see above)
-    z = marginalize(x_and_y_and_z, "Z")
-    return entropy(x_and_y_and_z['P(X^Y^Z)']) - entropy(z)
-
-
-def cond_information3(x_and_y_and_z):
+def cond_mutual_information(x_and_y_and_z):
     # I(X;Y|Z) = H(X,Z)+ H(Y,Z) - H(Z) - H(X,Y,Z)
 
     x_and_z = marginalize(x_and_y_and_z, ["X", "Z"])
@@ -91,6 +90,12 @@ def cond_information3(x_and_y_and_z):
     z = marginalize(x_and_y_and_z, "Z")
 
     return entropy(x_and_z) + entropy(y_and_z) - entropy(z) - entropy(x_and_y_and_z['P(X^Y^Z)'])
+
+
+def cond_joint_entropy(x_and_y_and_z):
+    # H(X,Y|Z) = H(X,Y,Z) - H(Z) (see above)
+    z = marginalize(x_and_y_and_z, "Z")
+    return entropy(x_and_y_and_z['P(X^Y^Z)']) - entropy(z)
 
 
 def implementation():
@@ -112,8 +117,8 @@ def implementation():
         columns=["X", "Y", "P(X^Y)"])
 
     y = pd.DataFrame([[True, 0.3],
-                          [False, 0.7]],
-                         columns=["Y", "P(Y)"])
+                      [False, 0.7]],
+                     columns=["Y", "P(Y)"])
 
     x_and_y_and_z = pd.DataFrame(
         [[True, True, True, 0.25],
@@ -130,19 +135,18 @@ def implementation():
     entropy(x_and_y)
 
     # Q2
-    joint_entropy2(x_and_y)
+    joint_entropy(x_and_y)
 
     # Q3
-    cond_entropy2(x_given_y, y)
+    cond_entropy(x_given_y, y)
 
     # Q4
     mutual_information(x_and_y)
 
     # Q5
     joint_entropy3(x_and_y_and_z)
-    cond_entropy3(x_and_y_and_z)
-    cond_information3(x_and_y_and_z)
-
+    cond_joint_entropy(x_and_y_and_z)
+    cond_mutual_information(x_and_y_and_z)
 
 
 def medical_diagnosis():
@@ -154,16 +158,45 @@ def medical_diagnosis():
     jpd[0] /= jpd[0].sum()  # r[0] is the new counts columns
 
     # Question 6
+
+    entropies = []
+    cardinalities = []
+    names = []
     for var_name in jpd.columns[0:-1]:
-        print(f"{var_name}\tcard:{len(jpd[var_name].unique())} {entropy(marginalize(jpd, var_name)):.3f}")
+        card = len(jpd[var_name].unique())
+        e = entropy(marginalize(jpd, var_name))
+
+        names.append(var_name)
+        cardinalities.append(card)
+        entropies.append(e)
+
+        print(
+            f"{var_name}\tcard:{card} {e:.3f}")
+
+    plt.figure()
+    plt.scatter(cardinalities, entropies)
+    for i, name in enumerate(names):
+        plt.annotate(name, (cardinalities[i], entropies[i]))
+    plt.xticks([2,3,4])
+    plt.xlabel("Cardinalities")
+    plt.ylabel("Entropies")
+    plt.savefig("entropiescardinalities.pdf")
+    plt.show()
+
 
     # Question 7
 
-    # All variables names, without the disease
-    vnames = set(list(df.columns)) - set(['DIS'])
+    # All variables names excluding the disease
+    # list to keep order
+    vnames = list(set(list(df.columns)) - set(['DIS']))
 
+    entropies = []
     for vname in vnames:
-        """ Compute the conditional entropy based on joint probability table.
+        """ Compute the conditional entropy based on joint
+        probability table.
+
+        We can't reuse our funtion cond_entropy() because it expects
+        P(X|Y) but the most direct thing we have is P(X^Y).
 
         Slide 3, course 2 : H(X|Y) = − Σ Σ P(Xi ∩ Yj) log P(Xi | Yj)
         Applying P(a|b) = P(a,b) / P(b), we get :
@@ -173,39 +206,53 @@ def medical_diagnosis():
         H(D|S) = − Σ Σ P(Di ∩ Sj) log P(Di ∩ Sj) / P(Sj)
         """
 
-        dis_symptom = marginalize(jpd, ["DIS", vname], True)
-        symptom = marginalize(dis_symptom, vname, True)
-        m = pd.merge(dis_symptom, symptom)  # relate (x_i^y_j)'s to y_j's
-        p_di_sj = m[m.columns[-2]]  # P(x_i^y_j)
-        p_sj = m[m.columns[-1]]  # P(y_j)
+        dis_symptom = marginalize(jpd, ["DIS", vname], True)  # P(D ∩ S)
+        symptom = marginalize(dis_symptom, vname, True)  # P(S)
+
+        m = pd.merge(dis_symptom, symptom)  # relate (d_i ^ s_j)'s to s_j's
+        p_di_sj = m[m.columns[-2]]  # P(d_i^s_j)
+        p_sj = m[m.columns[-1]]  # P(s_j)
         e = - np.sum(p_di_sj * np.log2(p_di_sj / p_sj))
 
-        if vname in ('JAU','BIL'):
-            mark = "***"
-        else:
-            mark = ""
+        entropies.append( (vname,e) )
 
-        print(f"H(DIS|{vname})\t{e:.3f} {mark}")
+    for vname, e in sorted(entropies, key=lambda p:p[1]):
+        e = f"{e:.3f}"
+        if vname in ('JAU', 'BIL'):
+            vname = f"\\textbf{{{vname}}}"
+            e = f"\\textbf{{{e}}}"
+
+        print(f"{vname} & {e} \\\\")
 
     # Question 8
 
-    obesity_age = marginalize(jpd, ["obesity","age"], True)
+    obesity_age = marginalize(jpd, ["obesity", "age"], True)
 
-    print(mutual_information(obesity_age, "obesity","age"))
-    print(mutual_information(obesity_age, "age","obesity"))
+    print(mutual_information(obesity_age, "obesity", "age"))
+    print(mutual_information(obesity_age, "age", "obesity"))
 
     # Question 9
 
+    print("-"*80)
+    mutual_info = []
     for vname in vnames:
         dis_symptom = marginalize(jpd, ["DIS", vname], True)
         mi = mutual_information(dis_symptom, "DIS", vname)
-        print(f"I(DIS;{vname})\t{mi:.3f}")
+
+        mutual_info.append((vname,mi))
+
+
+    for vname, i in sorted(mutual_info, key=lambda p:p[1]):
+        i = f"{i:.3f}"
+        print(f"{vname} & {i} \\\\")
+
 
     # Question 10
 
     # Compute joint proabilities and add them to the table
 
-    jpd = df[df.DIS.isin(['steatosis', 'healthy'])].groupby(list(df.columns)).size().reset_index()
+    jpd = df[df.DIS.isin(['steatosis', 'healthy'])].groupby(
+        list(df.columns)).size().reset_index()
     jpd[0] /= jpd[0].sum()  # r[0] is the counts columns
 
     for vname in vnames:
@@ -222,8 +269,6 @@ def medical_diagnosis():
 
     # import code
     # code.interact(local=dict(globals(), **locals()))
-
-
 
 
 if __name__ == "__main__":
