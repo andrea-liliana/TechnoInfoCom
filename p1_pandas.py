@@ -3,6 +3,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+# from itertools import permutations
+
+# a = [0, 1, 0, 2]
+
+# S = 6
+# counts = np.zeros(S)
+# for i in range(S):
+#     # a = [ 1 1 ..1 0 0 .. 0 ]
+#     a = [1] * i + [0] * (S-i)
+#     print(a)
+#     perms = set(permutations(a))
+
+#     for perm in perms:
+#         counts += np.array(perm)
+
+#     print(len(perms))
+
+# print( counts)
+# exit()
+
+
+
+
 def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
     """
     Marginalize variables out of probability distribution table.
@@ -63,16 +86,29 @@ def cond_entropy(x_given_y, y):
 
 
 def mutual_information(x_and_y, var_x="X", var_y="Y"):
-    # I(X;Y) = H(X) + H(Y) - H(X,Y) (See wikipedia)
+    """ Computes :
+
+    I(X;Y) = H(X) + H(Y) - H(X,Y) (See wikipedia)
+
+    Expects parameters :
+
+    x_and_y : a table (DataFrame) giving P(one row of the table)
+    var_x : name of the variable X, must be in the columns of x_and_y
+    var_y : name of the variable Y, must be in the columns of x_and_y
+    """
 
     # The code here is a bit more dynamic so we can
     # use this function in part 1 and 2 of the
     # problem statement.
 
+    # Compute probabilities for all values of random variable X.
     x = marginalize(x_and_y, var_x)
     y = marginalize(x_and_y, var_y)
     # last column is the probabilities
     p_x_and_y = x_and_y[x_and_y.columns[-1]]
+
+    # FIXME What happen sif the table has these
+    # columns : X,Y,a,b,c,P(row)
 
     return entropy(x) + entropy(y) - entropy(p_x_and_y)
 
@@ -143,6 +179,11 @@ def implementation():
     # Q4
     mutual_information(x_and_y)
 
+    # FIXME Andrea and stF to make test scenario
+
+    # assert mutual_information(x_and_y) == 0.9, "Ooops, unecpected"
+
+
     # Q5
     joint_entropy3(x_and_y_and_z)
     cond_joint_entropy(x_and_y_and_z)
@@ -154,16 +195,47 @@ def medical_diagnosis():
     print(df)
 
     # Compute joint proabilities and add them to the table
+
+    """
+
+    a,i,w
+    a,i,w
+    a,i,z
+
+    =>
+
+    a,i,w 2
+    a,i,z 1
+    """
+
     jpd = df.groupby(list(df.columns)).size().reset_index()
-    jpd[0] /= jpd[0].sum()  # r[0] is the new counts columns
+
+    """
+    a,i,w 2 / sum(1+2) => P(a,i,w)
+    a,i,z 1 / sum(1+2) => P(a,i,z)
+    """
+
+    jpd[0] /= jpd[0].sum()  # r[0] is the new counts columns; it's the last column
 
     # Question 6
 
     entropies = []
     cardinalities = []
     names = []
-    for var_name in jpd.columns[0:-1]:
+
+    """
+    age, obseity, BIL, ...
+    ----------------------------
+    >40, y,       10
+    <40, n,       11
+    ...
+    """
+
+    for var_name in jpd.columns[0:-1]: # every column but the last one
         card = len(jpd[var_name].unique())
+        # => >40, <40. => cardinality
+
+        # H(age) = P(>40)*log(P(>40)) + P(<40)*log(P(<40))
         e = entropy(marginalize(jpd, var_name))
 
         names.append(var_name)
@@ -186,23 +258,41 @@ def medical_diagnosis():
 
     # Question 7
 
-    # All variables names excluding the disease
-    # list to keep order
+    # All variables names excluding the disease (DIS)
+    # Make a list(...) to keep order
     vnames = list(set(list(df.columns)) - set(['DIS']))
 
     entropies = []
     for vname in vnames:
-        """ Compute the conditional entropy based on joint
+        """ Compute the conditional entropy H(DIS|variable) based on joint
         probability table.
+
+        age, obseity, BIL, ...
+        ----------------------------
+        >40, y,       10
+        <40, n,       11
+        ... for missing combinations of variables we have :
+        ?,   ?,       ? => P(?,?,?) = 0
+
+        X Y Z P(X,y,Z)
+        --------------   --> FULL P(x,y,z) table.
+        n n n 0.1
+        n y n
+        n n y
+        n y y
+        y n n
+        y y n
+        y n y
+        y y y
 
         We can't reuse our funtion cond_entropy() because it expects
         P(X|Y) but the most direct thing we have is P(X^Y).
 
         Slide 3, course 2 : H(X|Y) = − Σ Σ P(Xi ∩ Yj) log P(Xi | Yj)
-        Applying P(a|b) = P(a,b) / P(b), we get :
+        Applying P(a|b) = P(a ^ b) / P(b), we get :
         H(X|Y) = − Σ Σ P(Xi ∩ Yj) log P(Xi ∩ Yj) / P(Yj)
 
-        Renaming
+        Renaming X -> D, T -> S(ymptom)
         H(D|S) = − Σ Σ P(Di ∩ Sj) log P(Di ∩ Sj) / P(Sj)
         """
 
@@ -212,7 +302,7 @@ def medical_diagnosis():
         m = pd.merge(dis_symptom, symptom)  # relate (d_i ^ s_j)'s to s_j's
         p_di_sj = m[m.columns[-2]]  # P(d_i^s_j)
         p_sj = m[m.columns[-1]]  # P(s_j)
-        e = - np.sum(p_di_sj * np.log2(p_di_sj / p_sj))
+        e = - np.sum(p_di_sj * np.log2(p_di_sj / p_sj)) # compute H
 
         entropies.append( (vname,e) )
 
@@ -229,7 +319,7 @@ def medical_diagnosis():
     obesity_age = marginalize(jpd, ["obesity", "age"], True)
 
     print(mutual_information(obesity_age, "obesity", "age"))
-    print(mutual_information(obesity_age, "age", "obesity"))
+    print(mutual_information(obesity_age, "age", "obesity")) # swap variabkes to checking for bugs
 
     # Question 9
 
@@ -249,15 +339,17 @@ def medical_diagnosis():
 
     # Question 10
 
-    # Compute joint proabilities and add them to the table
+    # Recompute joint proabilities excluding steatosis/healthy
 
     jpd = df[df.DIS.isin(['steatosis', 'healthy'])].groupby(
         list(df.columns)).size().reset_index()
     jpd[0] /= jpd[0].sum()  # r[0] is the counts columns
 
+    mutual_info = []
     for vname in vnames:
         dis_symptom = marginalize(jpd, ["DIS", vname], True)
         symptom = marginalize(dis_symptom, vname, True)
+
         m = pd.merge(dis_symptom, symptom)  # relate (x_i^y_j)'s to y_j's
         p_di_sj = m[m.columns[-2]]  # P(x_i^y_j)
         p_sj = m[m.columns[-1]]  # P(y_j)
@@ -265,7 +357,15 @@ def medical_diagnosis():
         e = - np.sum(p_di_sj * np.log2(p_di_sj / p_sj))
         mi = mutual_information(dis_symptom, "DIS", vname)
 
-        print(f"DIS|{vname:10s}:\tH={e:.3f} I={mi:.3f}")
+        mutual_info.append((vname,mi))
+        # print(f"DIS|{vname:10s}:\tH={e:.3f} I={mi:.3f}")
+
+
+    with open("question10.inc","w") as fout:
+        for vname, mi in sorted(mutual_info, key=lambda p:p[1]):
+            fout.write(f"{vname} & {mi:.3f} \\\\\n")
+
+
 
     # import code
     # code.interact(local=dict(globals(), **locals()))
