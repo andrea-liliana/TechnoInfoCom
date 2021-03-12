@@ -78,10 +78,8 @@ def clue(px,py,display=False):
     return mines, unrevealed_neighbours, clue_entropy
 
 
-def update_board():
-    entropies = np.ones((10,10)) * 99
-    #print(REVEAL)
-    # print("")
+
+def draw_board(entropies):
     for y in range(10):
         s = ""
         for x in range(10):
@@ -96,11 +94,24 @@ def update_board():
                     s += "   M   "
                 else:
                     mines, uneighbours, clue_entropy = clue(x, y)
-                    entropies[y,x] = clue_entropy
                     s += f"{mines}/{entropies[y,x]:.2f} "
             else:
                 s += "   .   "
         print(f"{s}")
+
+
+def compute_board_entropies():
+    entropies = np.ones((10,10)) * 99
+    #print(REVEAL)
+    # print("")
+    for y in range(10):
+        s = ""
+        for x in range(10):
+            if REVEAL[y,x] == 1:
+                if MINES[y,x] == 0:
+                    mines, uneighbours, clue_entropy = clue(x, y)
+                    entropies[y,x] = clue_entropy
+                    s += f"{mines}/{entropies[y,x]:.2f} "
     return entropies
 
 all_turns = 0
@@ -118,20 +129,22 @@ for game in range(1):
 
     turns = 0
     while True:
+        entropies = compute_board_entropies()
+        draw_board(entropies)
+
         print("\nNo mine")
         clue(0,0,True)
         REVEAL[1,0] = 1
-        entropies = update_board()
         clue(0,0,True)
         REVEAL[1,0] = 0
-        entropies = update_board()
+        entropies = compute_board_entropies()
         print("\nMine")
         clue(3,0,True)
         REVEAL[1,3] = 1
-        entropies = update_board()
+        entropies = compute_board_entropies()
         clue(3,0,True)
         REVEAL[1,3] = 0
-        entropies = update_board()
+        entropies = compute_board_entropies()
         break
 
 
