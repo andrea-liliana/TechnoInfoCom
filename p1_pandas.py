@@ -3,39 +3,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-# from itertools import permutations
-
-# a = [0, 1, 0, 2]
-
-# S = 6
-# counts = np.zeros(S)
-# for i in range(S):
-#     # a = [ 1 1 ..1 0 0 .. 0 ]
-#     a = [1] * i + [0] * (S-i)
-#     print(a)
-#     perms = set(permutations(a))
-
-#     for perm in perms:
-#         counts += np.array(perm)
-
-#     print(len(perms))
-
-# print( counts)
-# exit()
-
-
-
-
 def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
     """
     Marginalize variables out of probability distribution table.
-    The probability distribution table is a DataFrame of which
+
+    dist_table: The probability distribution table is a DataFrame of which
     the first columns are the random variables values and the
     last column is the probability of having this combination
-    of values. For example : X, Y, P(X ^ Y)
+    of values (joint probability). For example : X, Y, P(X ^ Y)
+    Each column are labelled with capital letter
+    denoting the name of the variable (for the columns containing
+    variables).
 
-    Each column of variables are labelled with capital letter
-    denoting the name of the variable.
+    variables: teh marginalization target. So If one has P(X^Y) and
+    want to get P(X) out of it, then X is such a target.
     """
 
     p_column = dist_table.columns[-1]
@@ -58,7 +39,7 @@ def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
         return r
 
 
-def entropy(probabilities):
+def entropy(probabilities: np.array):
     """
     Computes H(X)
 
@@ -72,34 +53,49 @@ def entropy(probabilities):
     return - np.sum(non_zero * np.log2(non_zero))
 
 
-def joint_entropy(x_and_y):
-    # Compute the joint entropy
+def joint_entropy(x_and_y: pd.DataFrame):
+    """
+    Computes the joint entropy H(X,Y)
+
+    Expects a dataframe with three columns :
+    - values of X
+    - values of Y
+    - P(X=x, Y=y) : probability distribution; must sum to one.
+    """
+
     return entropy(x_and_y["P(X^Y)"])
 
 
-def cond_entropy(x_given_y, y):
-    # Compute the conditional entropy
+def cond_entropy(x_given_y: pd.DataFrame, y: pd.DataFrame):
+    """
+    Compute the conditional entropy
+
+    Expects a dataframe with three columns :
+    - x_given_y: values of X|Y as table of rows (x,y,X=x|Y=y)
+    - y: values of P(Y=y) as one column table
+    """
 
     # First, relate P(X_i|Y_j) to P(Y_j)
     r = pd.merge(x_given_y, y)
     return - np.sum(r["P(X|Y)"] * r["P(Y)"] * np.log2(r["P(X|Y)"]))
 
 
-def mutual_information(x_and_y, var_x="X", var_y="Y"):
+def mutual_information(x_and_y: pd.DataFrame,
+                       var_x: str = "X",
+                       var_y: str = "Y"):
     """ Computes :
 
-    I(X;Y) = H(X) + H(Y) - H(X,Y) (See wikipedia)
+    I(X;Y) = H(X) + H(Y) - H(X,Y)
 
     Expects parameters :
 
-    x_and_y : a table (DataFrame) giving P(one row of the table)
-    var_x : name of the variable X, must be in the columns of x_and_y
-    var_y : name of the variable Y, must be in the columns of x_and_y
+    - x_and_y : a table (DataFrame) giving P(one row of the table)
+    - var_x : name of the variable X, must be in the columns of x_and_y
+    - var_y : name of the variable Y, must be in the columns of x_and_y
     """
 
-    # The code here is a bit more dynamic so we can
-    # use this function in part 1 and 2 of the
-    # problem statement.
+    # The code here is a bit more dynamic so we can use this function
+    # in part 2 of the problem statement.
 
     # Compute probabilities for all values of random variable X.
     x = marginalize(x_and_y, var_x)
@@ -125,7 +121,7 @@ def cond_mutual_information(x_and_y_and_z):
     y_and_z = marginalize(x_and_y_and_z, ["Y", "Z"])
     z = marginalize(x_and_y_and_z, "Z")
 
-    return entropy(x_and_z) + entropy(y_and_z) - entropy(z) - entropy(x_and_y_and_z['P(X^Y^Z)'])
+    return entropy(x_and_z) - entropy(z) - entropy(x_and_y_and_z['P(X^Y^Z)']) + entropy(y_and_z)
 
 
 def cond_joint_entropy(x_and_y_and_z):
@@ -178,11 +174,6 @@ def implementation():
 
     # Q4
     mutual_information(x_and_y)
-
-    # FIXME Andrea and stF to make test scenario
-
-    # assert mutual_information(x_and_y) == 0.9, "Ooops, unecpected"
-
 
     # Q5
     joint_entropy3(x_and_y_and_z)
@@ -242,8 +233,9 @@ def medical_diagnosis():
         cardinalities.append(card)
         entropies.append(e)
 
-        print(
-            f"{var_name}\tcard:{card} {e:.3f}")
+    with open("question6.inc","w") as fout:
+        for vname, ent in sorted( zip(names, entropies), key=lambda t:t[1]):
+            fout.write(f"{vname} & {ent:.3f} \\\\\n")
 
     plt.figure()
     plt.scatter(cardinalities, entropies)

@@ -2,7 +2,37 @@ import random
 import numpy as np
 np.set_printoptions(precision=2)
 
-random.seed(14)
+# Need both
+random.seed(10)
+np.random.seed(15)
+
+
+def entropy(probabilities: np.array):
+    """
+    Computes H(X)
+
+    X is given as a numpy array, all elements of the array
+    are assumed to represent the distribution (to the shape
+    of the array is not meaningful)
+    """
+
+    # Avoid situations where log can't be computed
+    non_zero = probabilities[probabilities != 0]
+    return - np.sum(non_zero * np.log2(non_zero))
+
+
+
+# for i in range(4,1,-1):
+#     mine = 2
+#     e = entropy(np.array([mine/i]*i))
+#     print(f"H={e}")
+# print()
+# for i in range(4,1,-1):
+#     mine = 0
+#     e = entropy(np.array([mine/i]*i))
+#     print(f"H={e}")
+# exit()
+
 
 """
 
@@ -71,6 +101,9 @@ def clue(px,py,display=False):
         clue_entropy = 0
     else:
         p = float(mines)/unrevealed_neighbours
+
+        # H = -sum_{p_i} p_i log2 p_i
+
         clue_entropy = - unrevealed_neighbours * p * np.log2(p)
 
     if display:
@@ -102,20 +135,18 @@ def draw_board(entropies):
 
 def compute_board_entropies():
     entropies = np.ones((10,10)) * 99
-    #print(REVEAL)
-    # print("")
     for y in range(10):
-        s = ""
         for x in range(10):
-            if REVEAL[y,x] == 1:
-                if MINES[y,x] == 0:
-                    mines, uneighbours, clue_entropy = clue(x, y)
-                    entropies[y,x] = clue_entropy
-                    s += f"{mines}/{entropies[y,x]:.2f} "
+            if REVEAL[y, x] == 1: # and MINES[y,x] == 0:
+                mines, uneighbours, clue_entropy = clue(x, y)
+                entropies[y, x] = clue_entropy
+
+    #print(entropies)
     return entropies
 
+
 all_turns = 0
-for game in range(1):
+for game in range(200):
     MINES = np.random.randint(2, size=(10,10))
     for i in range(100):
         x = random.randint(0,9)
@@ -124,7 +155,7 @@ for game in range(1):
 
     #print(MINES)
     REVEAL = np.zeros((10,10),dtype=int)
-    REVEAL[0:1,:] = 1
+    #REVEAL[0:1,:] = 1
     #REVEAL[1,3:7] = 1
 
     turns = 0
@@ -132,68 +163,82 @@ for game in range(1):
         entropies = compute_board_entropies()
         draw_board(entropies)
 
-        print("\nNo mine")
-        clue(0,0,True)
-        REVEAL[1,0] = 1
-        clue(0,0,True)
-        REVEAL[1,0] = 0
-        entropies = compute_board_entropies()
-        print("\nMine")
-        clue(3,0,True)
-        REVEAL[1,3] = 1
-        entropies = compute_board_entropies()
-        clue(3,0,True)
-        REVEAL[1,3] = 0
-        entropies = compute_board_entropies()
-        break
+        # print("\nNo mine")
+        # clue(0,0,True)
+        # REVEAL[1,0] = 1
+        # clue(0,0,True)
+        # REVEAL[1,0] = 0
+        # entropies = compute_board_entropies()
+        # print("\nMine")
+        # clue(3,0,True)
+        # REVEAL[1,3] = 1
+        # entropies = compute_board_entropies()
+        # clue(3,0,True)
+        # REVEAL[1,3] = 0
+        # entropies = compute_board_entropies()
+        # break
 
+        # entropies = compute_board_entropies()
+        # print()
+        # print("   ",entropies[0,:])
+        # print("-"*66)
 
-        for x in range(10):
-            m_old = MINES[1, x]
-            _, _, c_before = clue(x, 0)
-            MINES[1, x] = 1
-            _, _, c_after = clue(x, 0)
-            MINES[1, x] = m_old
+        # for x in range(10):
+        #     m_old = REVEAL[1, x]
+        #     REVEAL[1, x] = 1
+        #     entropies = compute_board_entropies()
+        #     print(f"x={x}", entropies[0,:])
+        #     REVEAL[1, x] = m_old
 
-            # putting a mine leads to worse prediction, so previous
-            # prediction was not a mine...
-            choose = c_after - c_before > 0
-            print(f"x={x}: mine_old={m_old}, diff = {c_after - c_before}, {choose}")
+        #     # putting a mine leads to worse prediction, so previous
+        #     # prediction was not a mine...
+        #     # choose = c_after - c_before > 0
+        #     # print(f"x={x}: mine_old={m_old}, diff = {c_after - c_before}, {choose}")
 
-
-
+        # break
 
 
         best_entropy = None
 
         for px in range(10):
             for py in range(10):
-                if REVEAL[py,px] == 1:
+                if REVEAL[py, px] == 1:
                     continue
 
                 neighbours_pos = nb_pos(px, py)
 
+                entropy = 0
+                nn = 0
+                for x, y in neighbours_pos:
+                    if entropies[y, x] < 99:
+                        entropy += entropies[y, x]
+                        nn += 1
+                if nn == 0:
+                    # Not the fringe
+                    continue
+                entropy /= nn
+                #print(px,py,entropy)
+
                 # entropy = 0
                 # for x, y in neighbours_pos:
-                #     entropy += entropies[y, x]
-                # entropy /= len(neighbours_pos)
-
-                entropy = 0
-                for x, y in neighbours_pos:
-                    entropy = max(entropy, entropies[y, x])
+                #     entropy = max(entropy, entropies[y, x])
 
                 # Take minimal entropy
                 # IF there's a tie, then take the cell that will give
                 # the more clues
-                if best_entropy is None or entropy > best_entropy[0]  or (entropy == best_entropy[0]  and len(neighbours_pos) > best_entropy[1]) :
+                if best_entropy is None or entropy < best_entropy[0]  or (entropy == best_entropy[0]  and len(neighbours_pos) > best_entropy[1]) :
                     best_entropy = entropy, len(neighbours_pos), px, py
 
-        e,nn,x,y = best_entropy
-        #print(f"x={x}, y={y}, ent={e}, mine? {MINES[y,x] == 1}")
+        if best_entropy:
+            e,nn,x,y = best_entropy
+        else:
+            e,nn,x,y = -1, 0, 1, 1
+
+        print(f"x={x}, y={y}, ent={e}, mine? {MINES[y,x] == 1}")
 
         # Simulate random play
         # x = random.randint(0,9)
-        # y = 1
+        # y = random.randint(0,9)
 
         if MINES[y,x] == 1:
             break
