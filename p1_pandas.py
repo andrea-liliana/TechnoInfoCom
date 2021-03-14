@@ -3,25 +3,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
+def marginalize(dist_table: pd.DataFrame, var_to_keep, leave_values=False):
     """
     Marginalize variables out of probability distribution table.
 
     dist_table: The probability distribution table is a DataFrame of which
     the first columns are the random variables values and the
     last column is the probability of having this combination
-    of values (joint probability). For example : X, Y, P(X ^ Y)
+    of values (joint probability). For example : [X, Y, P(X ^ Y)].
     Each column are labelled with capital letter
     denoting the name of the variable (for the columns containing
     variables).
 
-    variables: teh marginalization target. So If one has P(X^Y) and
+    var_to_keep: the marginalization target. So If one has P(X^Y) and
     want to get P(X) out of it, then X is such a target.
     """
 
     p_column = dist_table.columns[-1]
-    r = dist_table.groupby(variables).agg(
+    r = dist_table.groupby(var_to_keep).agg(
         summed=(p_column, 'sum')).reset_index()
+
+    # Normalize probabilities so they sum to one.
     r['summed'] /= r['summed'].sum()
 
     if not leave_values:
@@ -31,10 +33,12 @@ def marginalize(dist_table: pd.DataFrame, variables, leave_values=False):
     else:
         # Return a fulle contingency table, with
         # nice colums headers.
-        if type(variables) == str:
-            p_name = f"P({variables})"
+        if type(var_to_keep) == str:
+            # Only one variable was given
+            p_name = f"P({var_to_keep})"
         else:
-            p_name = f"P({'^'.join(variables)})"
+            # Several variables were given
+            p_name = f"P({'^'.join(var_to_keep)})"
         r.rename(columns={'summed': p_name}, inplace=True)
         return r
 
@@ -114,14 +118,17 @@ def joint_entropy3(x_and_y_and_z):
     return entropy(x_and_y_and_z["P(X^Y^Z)"])
 
 
-def cond_mutual_information(x_and_y_and_z):
+def cond_mutual_information(x_and_y_and_z: pd.DataFrame):
+
     # I(X;Y|Z) = H(X,Z)+ H(Y,Z) - H(Z) - H(X,Y,Z)
 
-    x_and_z = marginalize(x_and_y_and_z, ["X", "Z"])
-    y_and_z = marginalize(x_and_y_and_z, ["Y", "Z"])
-    z = marginalize(x_and_y_and_z, "Z")
+    vx,vy,vz,joint_p = list(x_and_y_and_z.columns)
 
-    return entropy(x_and_z) - entropy(z) - entropy(x_and_y_and_z['P(X^Y^Z)']) + entropy(y_and_z)
+    x_and_z = marginalize(x_and_y_and_z, [vx, vz]) # X and Z
+    y_and_z = marginalize(x_and_y_and_z, [vy, vz])
+    z = marginalize(x_and_y_and_z, vz)
+
+    return entropy(x_and_z) - entropy(z) - entropy(x_and_y_and_z[joint_p]) + entropy(y_and_z)
 
 
 def cond_joint_entropy(x_and_y_and_z):
@@ -315,9 +322,9 @@ def medical_diagnosis():
     print(mutual_information(obesity_age, "obesity", "age"))
     print(mutual_information(obesity_age, "age", "obesity")) # swap variabkes to checking for bugs
 
-    # Try with different variables to see if the results are the same than in question 9 
+    # Try with different variables to see if the results are the same than in question 9
     obesity_dic = marginalize(jpd, ["obesity", "DIS"], True)
-    print(mutual_information(obesity_dic, "obesity", "DIS")) 
+    print(mutual_information(obesity_dic, "obesity", "DIS"))
     print(mutual_information(obesity_dic, "DIS", "obesity"))
 
     # Question 9
@@ -365,32 +372,27 @@ def medical_diagnosis():
             fout.write(f"{vname} & {mi:.3f} \\\\\n")
 
 
-
-    # import code
-    # code.interact(local=dict(globals(), **locals()))
-
     # Question 11
 
-
-    print("-"*80)
-    print("Question 11")
-
-    #age2  = df[ df.age == 'morethan40']
-    #print(age2)
-
-    jpd = df[df.age.isin(['morethan40'])].groupby(
+    jpd = df[df.age.isin(['morethan40', 'healthy'])].groupby(
         list(df.columns)).size().reset_index()
-    
-    dis_age = marginalize(jpd, ["DIS", "age"], True)
-    print(mutual_information(dis_age, "DIS", "age"))
+    jpd[0] /= jpd[0].sum()  # r[0] is the counts columns
+
+    mutual_info = []
+    vnames = list(set(list(df.columns)) - set(['DIS','age']))
+    for vname in vnames:
+        dis_symptom_age = marginalize(jpd, ["DIS", vname, 'age'], True)
+
+        # I(DIS;symptom|age)
+        cmi = cond_mutual_information(dis_symptom_age)
+
+        mutual_info.append((vname, cmi))
 
 
-    jpd = df[df.age.isin(['lessorequalthan40'])].groupby(
-        list(df.columns)).size().reset_index()
-    
-    dis_age = marginalize(jpd, ["DIS", "age"], True)
-    print(mutual_information(dis_age, "DIS", "age"))
-
+    with open("question11.inc","w") as fout:
+        for vname, cmi in sorted(mutual_info, key=lambda p:p[1]):
+            fout.write(f"{vname} & {cmi:.3f} \\\\\n")
+            print(f"I(DIS;{vname:10s}|age) :\tI={cmi:.3f}")
 
 
 
