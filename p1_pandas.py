@@ -314,12 +314,19 @@ def medical_diagnosis():
 
         print(f"{vname} & {e} \\\\")
 
+
+
     # Question 8
 
     obesity_age = marginalize(jpd, ["obesity", "age"], True)
 
     print(mutual_information(obesity_age, "obesity", "age"))
     print(mutual_information(obesity_age, "age", "obesity")) # swap variabkes to checking for bugs
+
+    # Try with different variables to see if the results are the same than in question 9 
+    obesity_dic = marginalize(jpd, ["obesity", "DIS"], True)
+    print(mutual_information(obesity_dic, "obesity", "DIS")) 
+    print(mutual_information(obesity_dic, "DIS", "obesity"))
 
     # Question 9
 
@@ -369,6 +376,30 @@ def medical_diagnosis():
 
     # import code
     # code.interact(local=dict(globals(), **locals()))
+
+    # Question 11
+
+
+    print("-"*80)
+    print("Question 11")
+
+    #age2  = df[ df.age == 'morethan40']
+    #print(age2)
+
+    jpd = df[df.age.isin(['morethan40'])].groupby(
+        list(df.columns)).size().reset_index()
+    
+    dis_age = marginalize(jpd, ["DIS", "age"], True)
+    print(mutual_information(dis_age, "DIS", "age"))
+
+
+    jpd = df[df.age.isin(['lessorequalthan40'])].groupby(
+        list(df.columns)).size().reset_index()
+    
+    dis_age = marginalize(jpd, ["DIS", "age"], True)
+    print(mutual_information(dis_age, "DIS", "age"))
+
+
 
 
 if __name__ == "__main__":
