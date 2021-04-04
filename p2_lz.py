@@ -49,7 +49,9 @@ with open(INPUT_FILE, 'r') as f:
 print(os.path.getsize(INPUT_FILE))
 
 # Test : from 0/1 string to np array
-print(np.frombuffer(np.array(map(int, coded_bin)), np.uint8))
+as_bin = np.frombuffer(np.array(map(int, coded_bin)), np.uint8)
+print(as_bin)
+print(np.unpackbits(as_bin)[0:len(coded_bin)])
 
 print(len(coded_bin) // 8)
 # print(coded_bin)
