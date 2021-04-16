@@ -10,13 +10,13 @@ INPUT_FILE = "genome.txt"
 the corresponding binary Huffman code and the encoded genome. Give the total length of the
 encoded genome and the compression rate. """
 
-f = np.genfromtxt("genome.txt",dtype='str')
-f = "".join(f)
+genome = np.genfromtxt("genome.txt",dtype='str')
+genome = "".join(genome)
 CODON_LEN = 3
 
 codons_cnt = dict()
-for i in range(0, len(f), CODON_LEN):
-    codon = f[i:i+CODON_LEN]
+for i in range(0, len(genome), CODON_LEN):
+    codon = genome[i:i+CODON_LEN]
     if codon not in codons_cnt:
         codons_cnt[codon] = 1
     else:
@@ -80,9 +80,37 @@ def codebook_builder(node: Node, prefix):
         return [node]
 
 
-d = codebook_builder(nodes[0][1], prefix = "")
+d = codebook_builder(nodes[0][1], "")
+code_map = dict()
+decode_map = dict()
 for node in sorted(d, key=lambda n:n.weight):
     print(f"{node.symbol} {node.weight:5d} {node.code}")
+    code_map[node.symbol] = node.code
+    decode_map[node.code] = node.symbol
+
+
+from io import StringIO
+file_str = StringIO()
+for i in range(0, len(genome), CODON_LEN):
+    codon = genome[i:i+CODON_LEN]
+    file_str.write(code_map[codon])
+
+compressed = file_str.getvalue()
+print(len(compressed) // 8)
+
+prefix = ""
+file_str = StringIO()
+for c in compressed:
+    prefix += c
+    if prefix in decode_map:
+        file_str.write(decode_map[prefix])
+        prefix = ""
+
+decompressed = file_str.getvalue()
+print(len(decompressed))
+print(len(genome))
+
+assert genome == decompressed, "Decompressed data is not the same as compressed data"
 
 
 exit()
@@ -98,16 +126,16 @@ prefixes = {"" : 0}
 
 EOF_MARK = ''
 
-with open(INPUT_FILE, 'r') as f:
+with open(INPUT_FILE, 'r') as genome:
 
     # The whole point of this trickery is to detect
     # EOF one char ahead. This way we can tell when
     # we're processing the last character of the
     # input file
 
-    c = f.read(1)  # Read one byte
+    c = genome.read(1)  # Read one byte
     assert c != EOF_MARK, "Compressing empty file is not supported"
-    next_char = f.read(1)
+    next_char = genome.read(1)
     eof = next_char == EOF_MARK
 
     while True:
@@ -136,7 +164,7 @@ with open(INPUT_FILE, 'r') as f:
 
         if next_char != EOF_MARK:
             c = next_char
-            next_char = f.read(1)
+            next_char = genome.read(1)
             eof = next_char == EOF_MARK
         else:
             break
@@ -178,8 +206,8 @@ while ndx < len(coded_bin):
 
 #print(decoded)
 
-with open(INPUT_FILE, 'r') as f:
-    assert decoded == f.read()
+with open(INPUT_FILE, 'r') as genome:
+    assert decoded == genome.read()
 
 
 """
