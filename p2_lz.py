@@ -35,11 +35,12 @@ class Node:
     def __lt__(self, other):
         return self.weight < other.weight
 
-
+# Add leaves of the tree
 nodes = []
 for codon, cnt in codons_cnt.items():
     nodes.append( Node(None, None, cnt))
 
+# ORder leaves by weights
 nodes = list(sorted(nodes))
 
 while len(nodes) > 1:
