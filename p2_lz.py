@@ -40,6 +40,7 @@ class Node:
             self.symbol = symbol
 
         assert (left_child is None and right_child is None) or self.has_both_children()
+        self.code = None
 
     def has_both_children(self):
         return self.left_child is not None and self.right_child is not None
@@ -70,16 +71,20 @@ while len(nodes) > 1:
 def codebook_builder(node: Node, prefix):
 
     if node.has_both_children():
-        d = codebook_builder(node.left_child, prefix + "0")
-        d.update(codebook_builder(node.right_child, prefix + "1"))
-        return d
+        a = codebook_builder(node.left_child, prefix + "0")
+        b = codebook_builder(node.right_child, prefix + "1")
+        return a+b
     else:
         assert node.left_child is None and node.right_child is None
-        return {node.symbol: prefix}
+        node.code = prefix
+        return [node]
 
 
 d = codebook_builder(nodes[0][1], prefix = "")
-pprint(d)
+for node in sorted(d, key=lambda n:n.weight):
+    print(f"{node.symbol} {node.weight:5d} {node.code}")
+
+
 exit()
 
 
