@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import math
+import heapq
+from pprint import pprint
 
 INPUT_FILE = "genome.txt"
 
@@ -24,10 +26,23 @@ print(codons_cnt)
 # Building huffman tree bottom up.
 
 class Node:
-    def __init__(self, left_child, right_child, weight):
-        self._left_child = left_child
-        self._right_child = right_child
-        self.weight = weight
+    def __init__(self, left_child=None, right_child=None, weight=None, symbol=None):
+        self.left_child = left_child
+        self.right_child = right_child
+
+        if self.has_both_children():
+            assert weight is None and symbol is None
+            self.weight = self.left_child.weight + self.right_child.weight
+            self.symbol = None
+        else:
+            assert weight > 1 and symbol is not None
+            self.weight = weight
+            self.symbol = symbol
+
+        assert (left_child is None and right_child is None) or self.has_both_children()
+
+    def has_both_children(self):
+        return self.left_child is not None and self.right_child is not None
 
     def __eq__(self, other):
         return self.weight == other.weight
@@ -38,18 +53,33 @@ class Node:
 # Add leaves of the tree
 nodes = []
 for codon, cnt in codons_cnt.items():
-    nodes.append( Node(None, None, cnt))
+    nodes.append( (cnt,Node(None, None, cnt, codon)))
 
-# ORder leaves by weights
-nodes = list(sorted(nodes))
+# Order leaves by weights, heapq is a min-heap
+heapq.heapify(nodes)
 
 while len(nodes) > 1:
-    light_nodes = nodes[0:2]
-    nodes = nodes[2:]
-    nodes.append(Node(light_nodes[0], light_nodes[1], light_nodes[0].weight + light_nodes[1].weight))
+    # Pop the two nodes with the lowest weights
+    left = heapq.heappop(nodes)[1]
+    right = heapq.heappop(nodes)[1]
+
+    new_node = Node(left, right)
+    heapq.heappush(nodes, (new_node.weight, new_node))
 
 
+def codebook_builder(node: Node, prefix):
 
+    if node.has_both_children():
+        d = codebook_builder(node.left_child, prefix + "0")
+        d.update(codebook_builder(node.right_child, prefix + "1"))
+        return d
+    else:
+        assert node.left_child is None and node.right_child is None
+        return {node.symbol: prefix}
+
+
+d = codebook_builder(nodes[0][1], prefix = "")
+pprint(d)
 exit()
 
 
