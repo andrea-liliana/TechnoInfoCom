@@ -1,29 +1,18 @@
 import os
-import numpy as np
 import math
 import heapq
-from pprint import pprint
+from io import StringIO
+import numpy as np
 
 INPUT_FILE = "genome.txt"
-
-""" 5. Estimate the marginal probability distribution of all codons from the given genome, and determine
-the corresponding binary Huffman code and the encoded genome. Give the total length of the
-encoded genome and the compression rate. """
-
-genome = np.genfromtxt("genome.txt",dtype='str')
-genome = "".join(genome)
 CODON_LEN = 3
 
-codons_cnt = dict()
-for i in range(0, len(genome), CODON_LEN):
-    codon = genome[i:i+CODON_LEN]
-    if codon not in codons_cnt:
-        codons_cnt[codon] = 1
-    else:
-        codons_cnt[codon] += 1
-print(codons_cnt)
 
-# Building huffman tree bottom up.
+""" Q1 Implement a function that returns a binary Huffman code for a given probability distribution. Give
+the main steps of your implementation. Explain how to extend your function to generate a Huffman
+code of any alphabet size. Verify your code on Exercise 7 of the second list of exercises, and report
+the output of your code for this example. """
+
 
 class Node:
     def __init__(self, left_child=None, right_child=None, weight=None, symbol=None):
@@ -35,7 +24,7 @@ class Node:
             self.weight = self.left_child.weight + self.right_child.weight
             self.symbol = None
         else:
-            assert weight > 1 and symbol is not None
+            assert weight > 0 and symbol is not None, f"Weight={weight}, symbol={symbol}"
             self.weight = weight
             self.symbol = symbol
 
@@ -51,67 +40,152 @@ class Node:
     def __lt__(self, other):
         return self.weight < other.weight
 
-# Add leaves of the tree
-nodes = []
-for codon, cnt in codons_cnt.items():
-    nodes.append( (cnt,Node(None, None, cnt, codon)))
 
-# Order leaves by weights, heapq is a min-heap
-heapq.heapify(nodes)
+def build_huffman_tree(codons_cnt: dict):
+    # Create leaves of the tree
+    nodes = []
+    for codon, cnt in codons_cnt.items():
+        nodes.append((cnt,Node(None, None, cnt, codon)))
 
-while len(nodes) > 1:
-    # Pop the two nodes with the lowest weights
-    left = heapq.heappop(nodes)[1]
-    right = heapq.heappop(nodes)[1]
+    # Order leaves by weights, heapq is a min-heap
+    heapq.heapify(nodes)
 
-    new_node = Node(left, right)
-    heapq.heappush(nodes, (new_node.weight, new_node))
+    # Build the tree bottom up
+    while len(nodes) > 1:
+        # Pop the two nodes with the lowest weights
+        left = heapq.heappop(nodes)[1]
+        right = heapq.heappop(nodes)[1]
 
+        new_node = Node(left, right)
+        heapq.heappush(nodes, (new_node.weight, new_node))
 
-def codebook_builder(node: Node, prefix):
+    # return the remainging node which is the top node
+    # of the tree
+    return nodes[0][1]
 
+def compute_leaves_codes(node: Node, prefix=""):
     if node.has_both_children():
-        a = codebook_builder(node.left_child, prefix + "0")
-        b = codebook_builder(node.right_child, prefix + "1")
+        a = compute_leaves_codes(node.left_child, prefix + "0")
+        b = compute_leaves_codes(node.right_child, prefix + "1")
         return a+b
     else:
         assert node.left_child is None and node.right_child is None
         node.code = prefix
         return [node]
 
+ex7_freq = [0.05, 0.10, 0.15, 0.15, 0.2, 0.35]
+symbols = [f"{x:.2f}" for x in ex7_freq]
+top_node = build_huffman_tree(dict(zip(symbols, ex7_freq)))
+leaves = compute_leaves_codes(top_node)
 
-d = codebook_builder(nodes[0][1], "")
-code_map = dict()
-decode_map = dict()
-for node in sorted(d, key=lambda n:n.weight):
-    print(f"{node.symbol} {node.weight:5d} {node.code}")
-    code_map[node.symbol] = node.code
-    decode_map[node.code] = node.symbol
+def gid(node):
+    return f"{int(id(node))}"
+
+def draw_neato_tree(fout, node):
+    if node.has_both_children():
+        fout.write(f"{gid(node)} [label=\"{node.weight:.2f}\"]\n")
+
+        fout.write(f"{gid(node)} -- {gid(node.left_child)} [label=\"0\"]\n")
+        draw_neato_tree(fout, node.left_child)
+        fout.write(f"{gid(node)} -- {gid(node.right_child)} [label=\"1\"]\n")
+        draw_neato_tree(fout, node.right_child)
+    else:
+        fout.write(f"{gid(node)} [label=\"{node.symbol}\\n{node.code}\"]\n")
+
+with open("graph.dot","w") as fout:
+    fout.write("graph HuffmanTree {\n")
+    draw_neato_tree(fout,top_node)
+    r = " ".join([ gid(n)+";" for n in leaves])
+    fout.write(f"{{rank = same; {r}}}\n")
+    fout.write("}\n")
+exit()
 
 
-from io import StringIO
-file_str = StringIO()
-for i in range(0, len(genome), CODON_LEN):
-    codon = genome[i:i+CODON_LEN]
-    file_str.write(code_map[codon])
+def build_codebooks(top_node):
+    # Affect a code to each leaf node
+    d = compute_leaves_codes(top_node, "")
 
-compressed = file_str.getvalue()
-print(len(compressed) // 8)
+    # Build maps from/to symbol to/from Huffman codes
+    code_map = dict()
+    decode_map = dict()
+    for node in sorted(d, key=lambda n:n.weight):
+        #print(f"{node.symbol} {node.weight:5d} {node.code}")
+        code_map[node.symbol] = node.code
+        decode_map[node.code] = node.symbol
 
-prefix = ""
-file_str = StringIO()
-for c in compressed:
-    prefix += c
-    if prefix in decode_map:
-        file_str.write(decode_map[prefix])
-        prefix = ""
+    return code_map, decode_map
 
-decompressed = file_str.getvalue()
-print(len(decompressed))
-print(len(genome))
 
-assert genome == decompressed, "Decompressed data is not the same as compressed data"
+def compute_codons_frequencies(genome):
+    codons_cnt = dict()
+    for i in range(0, len(genome), CODON_LEN):
+        codon = genome[i:i+CODON_LEN]
+        if codon not in codons_cnt:
+            codons_cnt[codon] = 1
+        else:
+            codons_cnt[codon] += 1
+    return codons_cnt
 
+def encode(genome, code_map):
+    file_str = StringIO()
+    for i in range(0, len(genome), CODON_LEN):
+        codon = genome[i:i+CODON_LEN]
+        file_str.write(code_map[codon])
+
+    return file_str.getvalue()
+
+
+def decode(genome, decode_map):
+    prefix = ""
+    file_str = StringIO()
+    for c in compressed:
+        prefix += c
+        if prefix in decode_map:
+            file_str.write(decode_map[prefix])
+            prefix = ""
+    return file_str.getvalue()
+
+
+""" 5. Estimate the marginal probability distribution of all codons from the given genome, and determine
+the corresponding binary Huffman code and the encoded genome.
+Give the total length of the encoded genome and the compression rate. """
+
+genome = np.genfromtxt("genome.txt", dtype='str')
+genome = "".join(genome)
+codons_cnt = compute_codons_frequencies(genome)
+top_node = build_huffman_tree(codons_cnt)
+code_map, decode_map = build_codebooks(top_node)
+compressed = encode(genome, code_map)
+# Validate that compression works by decompressing
+assert genome == decode(genome, decode_map), "Decompressed data is not the same as compressed data"
+
+print(f"Genome size = {len(genome)*8} bits Compressed size = {len(compressed)} bits")
+
+
+""" For Q7 of Project2, I have two questions.
+
+1: Must we reuse the same Huffman codes (those of Q5) for each input
+genome length or should we recompute the Huffman codes for each of the
+input genome length ? I ask because I don't see the point in reusing
+the same Huffman code all the time.
+
+2: You ask to plot the empirical average length of the encoded genome.
+Do you confirm that there's an average to compute ? Indeed, when I
+encode the genome, there's only one possible encoding with one length,
+so I don't see on what I must compute an average.
+"""
+
+STEP = len(genome)//10
+for i in range(STEP, len(genome), STEP):
+    print(i)
+    g = genome[0:i]
+    codons_cnt = compute_codons_frequencies(g)
+    top_node = build_huffman_tree(codons_cnt)
+    code_map, decode_map = build_codebooks(top_node)
+
+    compressed = encode(g, code_map)
+    assert g == decode(compressed, decode_map)
+    print(f"{len(compressed)} / {len(g)*8} = {len(compressed) / (len(g)*8):.3f}")
 
 exit()
 
