@@ -128,3 +128,17 @@ plt.show()
 # QUESTION 20
 """ 20. How would you proceed to reduce the loss of information and/or
 to improve the communication rate? Justify. """
+
+"""
+
+We can use longer Hamming code. The rate of information transfer
+of (7,4) Hamming code is 4/7=0.57. If we use Hamming code (15,11)
+for example, we have a better rate of information transfer : 11/15 = 0.73
+which is higher than the (7,4) code, so it can transmit more information
+through each code. That's an application of channel coding (we use longer blocks)
+and it is valid because 15/11 is still lower than C = 0.919). FIXME not sure.
+
+So to transmit n bits of information, we'll need n*7/4 bits or
+n*15/11 bits. Which is shorter, so faster.
+
+"""
