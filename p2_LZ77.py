@@ -163,7 +163,7 @@ def LZ77_stc(input_text, SWSIZE):
 
 S = "abracadabrad"
 print(S)
-print()
+print(LZ77_stc(S, 7))
 
 import numpy as np
 genome = np.genfromtxt("genome.txt",dtype='str')
@@ -173,3 +173,4 @@ print("Compressing")
 compressed = LZ77_stc(genome, 7)
 print("Decompressing")
 decompressed = LZ77_decoder(compressed)
+assert decompressed == genome
