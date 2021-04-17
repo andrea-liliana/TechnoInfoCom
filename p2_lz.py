@@ -143,9 +143,10 @@ with open(INPUT_FILE, 'r') as genome:
             prefix = prefix + c
         else:
             # Either EOF on next char,
-            # either prefix+c not in prefixes
+            # either prefix+c not in prefixes.
+
             # In both case we store the prefix+c. That's
-            # especially useful when EOF is to be met since it
+            # especially useful when EOF is met since it
             # allows us to termiante the output stream cleanly.
 
             # Number of bits necessary to represent the length
