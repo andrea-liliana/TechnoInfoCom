@@ -1,4 +1,4 @@
-def LZ77(input_text, l, look_ahead_length):
+def LZ77_old(input_text, l, look_ahead_length):
 
     sliding_window = l
     encoded = []
@@ -94,7 +94,7 @@ in your algorithm ? In case your answer is no,
 
 """
 
-def LZ77_stc(input_text, SWSIZE):
+def LZ77_encoder(input_text, SWSIZE):
 
     def peek(ndx):
         if ndx < 0:
@@ -107,7 +107,7 @@ def LZ77_stc(input_text, SWSIZE):
     i = 0
     while i < len(input_text):
 
-        # We'll look for the longest match in the window
+        # We'll look for the longest match in the sliding window
 
         longest_prefix_pos = 0
         longest_prefix_len = 0
@@ -162,14 +162,15 @@ def LZ77_stc(input_text, SWSIZE):
 if __name__ == "__main__":
     S = "abracadabrad"
     print(S)
-    print(LZ77_stc(S, 7))
+    print(LZ77_encoder(S, 7))
 
     import numpy as np
     genome = np.genfromtxt("genome.txt",dtype='str')
     genome = "".join(genome)
 
     print("Compressing")
-    compressed = LZ77_stc(genome, 7)
+    compressed = LZ77_encoder(genome, 1024 // 2)
+    print(f"Compression has {len(compressed)} tuples")
     print("Decompressing")
     decompressed = LZ77_decoder(compressed)
     assert decompressed == genome
