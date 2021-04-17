@@ -120,10 +120,8 @@ def LZ77_stc(input_text, SWSIZE):
         # the one we use is trickier, it's because in the TA's example
         # he goes the other way around (right to left)... Not my fault :-/
 
+        r = range(i-1, i-SWSIZE-1, -1)
 
-        r = range(i - 1, i - SWSIZE -1, -1)
-        #r = range(i - SWSIZE, i)
-        #print(list(r))
         for pfx_start in r:
 
             # Try all prefixes starting at pfx_start
@@ -140,17 +138,17 @@ def LZ77_stc(input_text, SWSIZE):
                 prefix += peek(pfx_start+pfx_len)
                 pfx_len += 1
 
-                assert pfx_start+pfx_len < len(input_text)
+                # assert pfx_start+pfx_len < len(input_text)
                 # assert i+pfx_len < len(input_text)
 
             # Is this prefix better ?
             if pfx_len > longest_prefix_len:
-                #print(f"Best {pfx_start}")
+                # print(f"Best {pfx_start}")
                 longest_prefix_pos = pfx_start
                 longest_prefix_len = pfx_len
 
         if longest_prefix_len > 0:
-            #print("long")
+            # print("long")
             d, l, c = i - longest_prefix_pos, longest_prefix_len, input_text[i + longest_prefix_len]
         else:
             d, l, c = 0, 0, input_text[i]
@@ -161,16 +159,17 @@ def LZ77_stc(input_text, SWSIZE):
 
     return compressed
 
-S = "abracadabrad"
-print(S)
-print(LZ77_stc(S, 7))
+if __name__ == "__main__":
+    S = "abracadabrad"
+    print(S)
+    print(LZ77_stc(S, 7))
 
-import numpy as np
-genome = np.genfromtxt("genome.txt",dtype='str')
-genome = "".join(genome)
+    import numpy as np
+    genome = np.genfromtxt("genome.txt",dtype='str')
+    genome = "".join(genome)
 
-print("Compressing")
-compressed = LZ77_stc(genome, 7)
-print("Decompressing")
-decompressed = LZ77_decoder(compressed)
-assert decompressed == genome
+    print("Compressing")
+    compressed = LZ77_stc(genome, 7)
+    print("Decompressing")
+    decompressed = LZ77_decoder(compressed)
+    assert decompressed == genome
