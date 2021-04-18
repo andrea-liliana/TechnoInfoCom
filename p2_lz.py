@@ -45,7 +45,7 @@ def build_huffman_tree(codons_cnt: dict):
     # Create leaves of the tree
     nodes = []
     for codon, cnt in codons_cnt.items():
-        nodes.append((cnt,Node(None, None, cnt, codon)))
+        nodes.append((cnt, Node(None, None, cnt, codon)))
 
     # Order leaves by weights, heapq is a min-heap
     heapq.heapify(nodes)
@@ -63,6 +63,7 @@ def build_huffman_tree(codons_cnt: dict):
     # of the tree
     return nodes[0][1]
 
+
 def compute_leaves_codes(node: Node, prefix=""):
     if node.has_both_children():
         a = compute_leaves_codes(node.left_child, prefix + "0")
@@ -73,13 +74,16 @@ def compute_leaves_codes(node: Node, prefix=""):
         node.code = prefix
         return [node]
 
+
 ex7_freq = [0.05, 0.10, 0.15, 0.15, 0.2, 0.35]
 symbols = [f"{x:.2f}" for x in ex7_freq]
 top_node = build_huffman_tree(dict(zip(symbols, ex7_freq)))
 leaves = compute_leaves_codes(top_node)
 
+
 def gid(node):
     return f"{int(id(node))}"
+
 
 def draw_neato_tree(fout, node):
     if node.has_both_children():
@@ -92,12 +96,130 @@ def draw_neato_tree(fout, node):
     else:
         fout.write(f"{gid(node)} [label=\"{node.symbol}\\n{node.code}\"]\n")
 
-with open("graph.dot","w") as fout:
+
+with open("graph.dot", "w") as fout:
     fout.write("graph HuffmanTree {\n")
-    draw_neato_tree(fout,top_node)
-    r = " ".join([ gid(n)+";" for n in leaves])
+    draw_neato_tree(fout, top_node)
+    r = " ".join([gid(n)+";" for n in leaves])
     fout.write(f"{{rank = same; {r}}}\n")
     fout.write("}\n")
+
+
+""" Q2. Given a sequence of symbols, implement a function that returns
+a dictionary and the encoded sequence using the on-line Lempel-Ziv
+algorithm (see State of the art in data compression, slide
+50/53). Reproduce and report the example given in the course.
+
+"""
+
+def bits_to_represent(nb_values):
+    # Disontinuous ! == 0 in x==1 !
+    return math.ceil(math.log2(nb_values))
+
+def code_binary_char(c):
+    return c
+
+def code_ascii_char(c):
+    return f"{ord(c):08b}"
+
+def online_lz_compress(data, code_char):
+    coded_bin = ""
+
+    prefix = ""
+    prefixes = {"": 0}
+
+    EOF_MARK = ''
+
+    # The whole point of this trickery is to detect
+    # EOF one char ahead. This way we can tell when
+    # we're processing the last character of the
+    # input file
+
+    c = data.read(1)  # Read one byte
+    assert c != EOF_MARK, "Compressing empty file is not supported"
+    next_char = data.read(1)
+    eof = next_char == EOF_MARK
+
+    while True:
+        if not eof and prefix + c in prefixes:
+            prefix = prefix + c
+        else:
+            # We have :
+            # - either EOF on next char,
+            # - either prefix+c not in prefixes.
+            # But in both cases we store the (prefix,c). That's
+            # especially useful when EOF is met since it
+            # allows us to terminate the output stream cleanly.
+
+            # Number of bits necessary to represent the length
+            # of the prefixes table.
+            # FIXME this is not really fast.
+            l = bits_to_represent(len(prefixes))
+
+            # Append (prefix's number, c) to the output stream.
+            char = code_char(c)
+
+            #char = f"{ord(c):08b}"
+            if l == 0:
+                pfx = ""
+            else:
+                pfx = f"{np.binary_repr(prefixes[prefix],l)}"
+            coded_bin += f"{pfx}{char}"
+
+            # Record the new prefix and give it a number
+            prefixes[prefix + c] = len(prefixes)
+
+            # Prepare for next iteration
+            prefix = ""
+
+        if next_char != EOF_MARK:
+            c = next_char
+            next_char = data.read(1)
+            eof = next_char == EOF_MARK
+        else:
+            break
+
+    return coded_bin
+
+def decode_binary_char(data, ndx):
+    return data[ndx], 1
+
+def decode_ascii_char(data, ndx):
+    return chr(int(data[ndx:ndx+8], 2)), 8
+
+def online_lz_decompress(coded_bin, decode_char):
+    ndx = 0
+    decoded = ""
+    prefixes = {0: ""}
+    while ndx < len(coded_bin):
+
+        l = bits_to_represent(len(prefixes))
+        if l > 0:
+            prefix_code = int(coded_bin[ndx:ndx+l], 2)
+        else:
+            prefix_code = 0
+
+        char, skips = decode_char(coded_bin, ndx+l)
+
+        decoded += prefixes[prefix_code] + char
+        prefixes[len(prefixes)] = prefixes[prefix_code] + char
+        #ndx = ndx+l+8
+        ndx = ndx+l+skips
+
+    return decoded
+
+
+slide_50 = "1 0 11 01 010 00 10".replace(" ","")
+compressed = online_lz_compress(StringIO(slide_50),code_binary_char)
+assert compressed == "1 00 011 101 1000 0100 0010".replace(" ","")
+assert online_lz_decompress(compressed,decode_binary_char) == slide_50
+
+with open(INPUT_FILE, 'r') as genome:
+    compressed = online_lz_compress(genome, code_ascii_char)
+
+with open(INPUT_FILE, 'r') as genome:
+    assert online_lz_decompress(compressed, decode_ascii_char) == genome.read()
+
 exit()
 
 
@@ -108,7 +230,7 @@ def build_codebooks(top_node):
     # Build maps from/to symbol to/from Huffman codes
     code_map = dict()
     decode_map = dict()
-    for node in sorted(d, key=lambda n:n.weight):
+    for node in sorted(d, key=lambda n: n.weight):
         #print(f"{node.symbol} {node.weight:5d} {node.code}")
         code_map[node.symbol] = node.code
         decode_map[node.code] = node.symbol
@@ -126,7 +248,12 @@ def compute_codons_frequencies(genome):
             codons_cnt[codon] += 1
     return codons_cnt
 
+
 def encode(genome, code_map):
+    # Note that file end detection rely on file size
+    # (here it's detected by Python). So we don't add an
+    # additionaly symbol to represent the end of file.
+
     file_str = StringIO()
     for i in range(0, len(genome), CODON_LEN):
         codon = genome[i:i+CODON_LEN]
@@ -136,6 +263,9 @@ def encode(genome, code_map):
 
 
 def decode(genome, decode_map):
+    # File end is detected by file size. See remark in
+    # encode() funtcion.
+
     prefix = ""
     file_str = StringIO()
     for c in compressed:
@@ -150,16 +280,17 @@ def decode(genome, decode_map):
 the corresponding binary Huffman code and the encoded genome.
 Give the total length of the encoded genome and the compression rate. """
 
-genome = np.genfromtxt("genome.txt", dtype='str')
-genome = "".join(genome)
+genome = "".join(np.genfromtxt("genome.txt", dtype='str'))
 codons_cnt = compute_codons_frequencies(genome)
 top_node = build_huffman_tree(codons_cnt)
 code_map, decode_map = build_codebooks(top_node)
 compressed = encode(genome, code_map)
 # Validate that compression works by decompressing
-assert genome == decode(genome, decode_map), "Decompressed data is not the same as compressed data"
+assert genome == decode(
+    genome, decode_map), "Decompressed data is not the same as compressed data"
 
-print(f"Genome size = {len(genome)*8} bits Compressed size = {len(compressed)} bits")
+print(
+    f"Genome size = {len(genome)*8} bits Compressed size = {len(compressed)} bits")
 
 
 """ For Q7 of Project2, I have two questions.
@@ -196,7 +327,7 @@ coded_message = []
 coded_bin = ""
 
 prefix = ""
-prefixes = {"" : 0}
+prefixes = {"": 0}
 
 EOF_MARK = ''
 
@@ -268,7 +399,7 @@ while ndx < len(coded_bin):
     # c = coded_bin[ndx+l:ndx+l+1]
 
     decoded += prefixes[prefix_code] + c
-    #print(l,prefix_code,c,decoded)
+    # print(l,prefix_code,c,decoded)
 
     prefixes[len(prefixes)] = prefixes[prefix_code] + c
     ndx = ndx+l+8
@@ -279,7 +410,7 @@ while ndx < len(coded_bin):
 #     prefixes[len(prefixes)] = prefixes[prefix_code] + c
 #     decoded += prefixes[prefix_code] + c
 
-#print(decoded)
+# print(decoded)
 
 with open(INPUT_FILE, 'r') as genome:
     assert decoded == genome.read()
