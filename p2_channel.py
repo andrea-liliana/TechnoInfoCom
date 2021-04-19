@@ -15,6 +15,7 @@ RATE, WAV = scipy.io.wavfile.read('sound.wav')
 # QUESTION 15
 
 plt.plot(WAV)
+plt.title("Original wave")
 
 # QUESTION 16
 
@@ -27,6 +28,7 @@ unique_elements, counts_elements = np.unique(WAV, return_counts=True)
 
 plt.figure()
 plt.hist(WAV, bins=256)
+plt.title("Histogram of wave samples values counts")
 
 mapping = [None] * 256
 demapping = [2**7] * 256
@@ -51,7 +53,9 @@ assert decoded.all() == WAV.all()
 # QUESTION 17
 
 P = 0.01
-indices = random.sample(range(len(bin_encoded)), int(len(bin_encoded)*P))
+bits_to_flip = int(len(bin_encoded)*P)
+print(f"Generating noise : {int(len(bin_encoded)*P)} bits will be flipped out of {len(bin_encoded)}")
+indices = random.sample(range(len(bin_encoded)), bits_to_flip)
 bin_encoded_with_error = bin_encoded.copy()
 for i in indices:
     bin_encoded_with_error[i] = not bin_encoded_with_error[i]
@@ -61,8 +65,8 @@ for i in range(len(WAV)):
     v = np.dot(bin_encoded_with_error[i*7:(i+1)*7], np.array([64,32,16,8,4,2,1]))
     decoded[i] = demapping[v]
 
-print("Wrote decoded_with_errors.wav")
 scipy.io.wavfile.write("decoded_with_errors.wav", RATE, decoded)
+print("Wrote decoded_with_errors.wav")
 
 # QUESTION 18
 
@@ -117,12 +121,13 @@ for i in range(len(WAV)):
                np.array([64, 32, 16, 8, 4, 2, 1]))
     decoded[i] = demapping[v]
 
-scipy.io.wavfile.write("decoded_with_errors.wav", RATE, decoded)
+scipy.io.wavfile.write("decoded_corrected.wav", RATE, decoded)
 print("Wrote decoded_corrected.wav")
 
 print(np.min(decoded), np.max(decoded))
 plt.figure()
 plt.plot(decoded)
+plt.title("Decoded wave, no error correction, with noise")
 plt.show()
 
 # QUESTION 20
