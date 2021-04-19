@@ -77,24 +77,9 @@ def LZ77_decoder(encoded):
     return decoded
 
 
-"""
-Hello, I have a question regarding the LZ77 algorithm given
-in the project 2 statement.
-
-The sentence "A sliding window size l" is ambiguous.
-Does it mean "l is the size of the sliding window" or
-"we have a sliding window of size l" ? In the first case,
-the fact that l is used as a variable afterwards seems wrong
-(that is, the sliding window size changes over time).
-
-Also, according to many sources on the web, LZ77 makes
-use of a lookahead buffer which is not present in your
-algorithm. Do you confirm that there's no lookahead buffer
-in your algorithm ? In case your answer is no,
-
-"""
-
 def LZ77_encoder(input_text, SWSIZE):
+    """ Return a list of (distance, length, character) tuples.
+    """
 
     def peek(ndx):
         if ndx < 0:

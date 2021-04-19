@@ -3,6 +3,8 @@ import math
 import heapq
 from io import StringIO
 import numpy as np
+from p2_LZ77 import LZ77_encoder
+from collections import Counter
 
 INPUT_FILE = "genome.txt"
 CODON_LEN = 3
@@ -208,19 +210,17 @@ def online_lz_decompress(coded_bin, decode_char):
 
     return decoded
 
+if False:
+    slide_50 = "1 0 11 01 010 00 10".replace(" ", "")
+    compressed = online_lz_compress(StringIO(slide_50), code_binary_char)
+    assert compressed == "1 00 011 101 1000 0100 0010".replace(" ", "")
+    assert online_lz_decompress(compressed, decode_binary_char) == slide_50
 
-slide_50 = "1 0 11 01 010 00 10".replace(" ","")
-compressed = online_lz_compress(StringIO(slide_50),code_binary_char)
-assert compressed == "1 00 011 101 1000 0100 0010".replace(" ","")
-assert online_lz_decompress(compressed,decode_binary_char) == slide_50
+    with open(INPUT_FILE, 'r') as genome:
+        compressed = online_lz_compress(genome, code_ascii_char)
 
-with open(INPUT_FILE, 'r') as genome:
-    compressed = online_lz_compress(genome, code_ascii_char)
-
-with open(INPUT_FILE, 'r') as genome:
-    assert online_lz_decompress(compressed, decode_ascii_char) == genome.read()
-
-exit()
+    with open(INPUT_FILE, 'r') as genome:
+        assert online_lz_decompress(compressed, decode_ascii_char) == genome.read()
 
 
 def build_codebooks(top_node):
@@ -238,26 +238,28 @@ def build_codebooks(top_node):
     return code_map, decode_map
 
 
-def compute_codons_frequencies(genome):
-    codons_cnt = dict()
+def codons_iterator(genome):
     for i in range(0, len(genome), CODON_LEN):
-        codon = genome[i:i+CODON_LEN]
-        if codon not in codons_cnt:
-            codons_cnt[codon] = 1
-        else:
-            codons_cnt[codon] += 1
-    return codons_cnt
+        yield genome[i:i+CODON_LEN]
 
 
-def encode(genome, code_map):
-    # Note that file end detection rely on file size
-    # (here it's detected by Python). So we don't add an
-    # additionaly symbol to represent the end of file.
+def encode(symbol_iter, code_map):
+    """ Convert a serie of symbol into a serie of
+    corresponding codewords.
+
+    - symbol_iter : an iterator which will give all
+    the symbols of the data to compress, on by one,
+    in order.
+    - code_map : map from symbol to codeword.
+
+    Note that data end detection rely on the iterator end
+    (here it's detected by Python). So we don't add an
+    additionaly symbol to represent the end of file.
+    """
 
     file_str = StringIO()
-    for i in range(0, len(genome), CODON_LEN):
-        codon = genome[i:i+CODON_LEN]
-        file_str.write(code_map[codon])
+    for symbol in symbol_iter:
+        file_str.write(code_map[symbol])
 
     return file_str.getvalue()
 
@@ -281,16 +283,18 @@ the corresponding binary Huffman code and the encoded genome.
 Give the total length of the encoded genome and the compression rate. """
 
 genome = "".join(np.genfromtxt("genome.txt", dtype='str'))
-codons_cnt = compute_codons_frequencies(genome)
-top_node = build_huffman_tree(codons_cnt)
-code_map, decode_map = build_codebooks(top_node)
-compressed = encode(genome, code_map)
-# Validate that compression works by decompressing
-assert genome == decode(
-    genome, decode_map), "Decompressed data is not the same as compressed data"
+if True:
+    codons_cnt = Counter(codons_iterator(genome))
 
-print(
-    f"Genome size = {len(genome)*8} bits Compressed size = {len(compressed)} bits")
+    top_node = build_huffman_tree(codons_cnt)
+    code_map, decode_map = build_codebooks(top_node)
+    compressed = encode(codons_iterator(genome), code_map)
+    # Validate that compression works by decompressing
+    assert genome == decode(
+        genome, decode_map), "Decompressed data is not the same as compressed data"
+
+    ratio = len(compressed) / (len(genome)*8)
+    print(f"Genome size = {len(genome)*8} bits Compressed size = {len(compressed)} bits; ratio={ratio}")
 
 
 """ For Q7 of Project2, I have two questions.
@@ -306,18 +310,40 @@ encode the genome, there's only one possible encoding with one length,
 so I don't see on what I must compute an average.
 """
 
-STEP = len(genome)//10
-for i in range(STEP, len(genome), STEP):
-    print(i)
-    g = genome[0:i]
-    codons_cnt = compute_codons_frequencies(g)
-    top_node = build_huffman_tree(codons_cnt)
-    code_map, decode_map = build_codebooks(top_node)
+if False:
+    STEP = len(genome)//10
+    for i in range(STEP, len(genome), STEP):
+        print(i)
+        g = genome[0:i]
+        codons_cnt = Counter(codons_iterator(genome))
+        top_node = build_huffman_tree(codons_cnt)
+        code_map, decode_map = build_codebooks(top_node)
 
-    compressed = encode(g, code_map)
-    assert g == decode(compressed, decode_map)
-    print(f"{len(compressed)} / {len(g)*8} = {len(compressed) / (len(g)*8):.3f}")
+        compressed = encode(g, code_map)
+        assert g == decode(compressed, decode_map)
+        print(f"{len(compressed)} / {len(g)*8} = {len(compressed) / (len(g)*8):.3f}")
 
+
+""" Q12. Encode the genome using the best (according to your answer in
+the previous question) combination of LZ77 and Huffman
+algorithms. Give the total length of the encoded genome and the
+compression rate.
+"""
+
+
+#genome=genome[:10000*CODON_LEN]
+
+tuples = LZ77_encoder(genome, 1024)
+tuples_count = Counter(tuples)
+print(f"build_huffman_tree on {len(tuples)} tuples (of which {len(tuples_count)} are unique)")
+top_node = build_huffman_tree(tuples_count)
+code_map, decode_map = build_codebooks(top_node)
+
+def tuples_iterator(tuples):
+    for t in tuples:
+        yield t
+
+print(f"{len(encode(tuples_iterator(tuples), code_map))} bits for {len(genome)//CODON_LEN} codons")
 exit()
 
 
