@@ -103,7 +103,7 @@ def LZ77_encoder(input_text, SWSIZE):
         # This range is easy to understand (we just run the sliding
         # windows from left to right) : r = range(i - SWSIZE, i). But
         # the one we use is trickier, it's because in the TA's example
-        # he goes the other way around (right to left)... Not my fault :-/
+        # he goes the other way around (right to left)...
 
         r = range(i-1, i-SWSIZE-1, -1)
 

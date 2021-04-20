@@ -2,9 +2,12 @@ import os
 import math
 import heapq
 from io import StringIO
-import numpy as np
-from p2_LZ77 import LZ77_encoder
 from collections import Counter
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+from p2_LZ77 import LZ77_encoder
 
 INPUT_FILE = "genome.txt"
 CODON_LEN = 3
@@ -210,6 +213,52 @@ def online_lz_decompress(coded_bin, decode_char):
 
     return decoded
 
+
+from bitarray import bitarray
+
+def compress_values(values):
+    m = bits_to_represent(max(values))
+    fmt = f"{{:0{m}b}}"
+    bits = bitarray()
+    for v in values:
+        bits.extend(bitarray(fmt.format(v)))
+    return bits, m
+
+def decompress_values(bits, nb_values, bits_per_value):
+    return [int(bits[i*bits_per_value:(i+1)*bits_per_value].to01(), 2) for i in range(nb_values) ]
+
+def int32_to_bits(i):
+    return bitarray(f"{i:032b}")
+
+def compress_counts( counts):
+    bits_k,btr_k = compress_values(counts.keys())
+    bits_v,btr_v = compress_values(counts.values())
+
+    bits = int32_to_bits(btr_k)
+    bits.extend(int32_to_bits(btr_v))
+    bits.extend(int32_to_bits(len(counts)))
+    bits.extend(bits_k)
+    bits.extend(bits_v)
+    return bits
+
+def decompress_counts(bits):
+    btr_k = int(bits[0:32].to01(),2)
+    btr_v = int(bits[32:64].to01(),2)
+    length = int(bits[64:96].to01(),2)
+
+    nk = btr_k * length
+    nv = btr_v * length
+
+    k = [int(bits[96+i:96+i+btr_k].to01(),2) for i in range(0,nk, btr_k)]
+    v = [int(bits[96+i:96+i+btr_k].to01(),2) for i in range(nk,nk+nv, btr_v)]
+
+    return dict(zip(k,v))
+
+print(compress_values([1,2,3]))
+print(decompress_values(compress_values([1,2,3])[0], 3, 2))
+print(decompress_counts(compress_counts({1:2, 10:11, 12:13})))
+
+
 if False:
     slide_50 = "1 0 11 01 010 00 10".replace(" ", "")
     compressed = online_lz_compress(StringIO(slide_50), code_binary_char)
@@ -330,20 +379,120 @@ algorithms. Give the total length of the encoded genome and the
 compression rate.
 """
 
-
-#genome=genome[:10000*CODON_LEN]
-
-tuples = LZ77_encoder(genome, 1024)
-tuples_count = Counter(tuples)
-print(f"build_huffman_tree on {len(tuples)} tuples (of which {len(tuples_count)} are unique)")
-top_node = build_huffman_tree(tuples_count)
-code_map, decode_map = build_codebooks(top_node)
-
 def tuples_iterator(tuples):
     for t in tuples:
         yield t
 
-print(f"{len(encode(tuples_iterator(tuples), code_map))} bits for {len(genome)//CODON_LEN} codons")
+#genome=genome[:1000*CODON_LEN]
+
+genome_as_codons = [c for c in codons_iterator(genome)]
+print(f"{len(genome_as_codons)} codons")
+
+import os.path
+import pickle
+
+WIN_SIZE = 512*4
+CACHE_NAME=f"LZ77Cache{WIN_SIZE}.dat"
+if not os.path.exists(CACHE_NAME):
+    tuples = LZ77_encoder(genome_as_codons, WIN_SIZE)
+    with open(CACHE_NAME,"wb") as fout:
+        pickle.dump(tuples, fout)
+else:
+    with open(CACHE_NAME,"rb") as fin:
+        tuples = pickle.load(fin)
+
+compressed_size = len(tuples)*(10+10+6) # 10 bits for distance, 10 bits for length, 6 bits for codon.
+print(f"LZ77 only : {len(tuples)} tuples -> {compressed_size} bits => {compressed_size / len(genome_as_codons):.1f} bits per codon")
+
+small_c = [c for d,l,c in tuples]
+small_l = [l for d,l,c in tuples]
+small_d = [d for d,l,c in tuples]
+
+# --------------------------------------------------------------------
+# (l,d,c) -> tuple
+tuples_count = Counter(tuples)
+plt.plot(list(sorted(tuples_count.values())))
+
+print(f"\n\n2. build_huffman_tree on {len(tuples)} tuples (of which {len(tuples_count)} are unique)")
+
+
+tree_size = len(tuples_count) * (bits_to_represent(len(small_c)) + bits_to_represent(max(small_d)) + bits_to_represent(max(small_l)) + bits_to_represent(len(tuples_count)))
+print(f"Tree size = {tree_size} bits => {tree_size//8} bytes")
+
+
+top_node = build_huffman_tree(tuples_count)
+code_map, decode_map = build_codebooks(top_node)
+compressed_size = sum([len(code_map[t])*cnt for t, cnt in tuples_count.items()]) + tree_size
+print("Compressed size = {} bits => {:.1f} bits per codons".format(compressed_size, compressed_size / len(genome_as_codons)))
+
+# --------------------------------------------------------------------
+# (l,d,c) -> (l,c) + (d)
+
+dist_count = Counter(small_d)
+len_count = Counter(small_l)
+char_count = Counter(small_c)
+
+plt.figure()
+plt.plot(list(dist_count.values()))
+plt.xlabel("Distances")
+plt.ylabel("# occurences")
+plt.show()
+
+plt.figure()
+plt.plot(list(len_count.values()))
+plt.xlabel("Lengths")
+plt.ylabel("# occurences")
+plt.show()
+
+top_node = build_huffman_tree(dist_count)
+dist_code_map, dist_decode_map = build_codebooks(top_node)
+
+dist_tree_size = len(dist_count) * (bits_to_represent(max(dist_count.values())) + bits_to_represent(max(dist_count.keys())))
+len_tree_size = len(len_count) * (bits_to_represent(max(len_count.values())) + bits_to_represent(max(len_count.keys())))
+char_tree_size = len(char_count) * bits_to_represent(max(char_count.values()))
+
+all_trees_size = dist_tree_size + len_tree_size + char_tree_size
+
+print(f"All tree size = {all_trees_size} bits => {all_trees_size//8} bytes")
+top_node = build_huffman_tree(len_count)
+len_code_map, len_decode_map = build_codebooks(top_node)
+
+top_node = build_huffman_tree(char_count)
+char_code_map, decode_map = build_codebooks(top_node)
+
+print(f"Dist counts : {len(dist_count)}")
+print(f"Len counts : {len(len_count)}")
+print(f"C counts : {len(char_count)}")
+
+print(f"1. l + c + d : build_huffman_tree on {len(tuples)} tuples (of which {len(char_count)} are unique)")
+
+compressed_size = sum([len(char_code_map[c]) + len(len_code_map[l]) + len(dist_code_map[d]) for d,l,c in tuples]) + all_trees_size
+print("Compressed size = {} bits {} bytes => {:.1f} bits per codons".format(compressed_size, compressed_size//8, compressed_size / len(genome_as_codons)))
+plt.figure()
+plt.plot(list(sorted(char_count.values())))
+plt.show()
+
+
+# --------------------------------------------------------------------
+
+bits = bitarray()
+bits.extend(compress_counts(dist_count))
+bits.extend(compress_counts(len_count))
+
+# This expression ensure the {codon -> count} map is
+# sorted in codons order. This willl esae the decompression
+# And prevent us to store the codons values themselves.
+
+assert len(char_count) == 64, f"FIXME Simplifcation, all codons must show up {len(char_count)}"
+bits.extend(
+    compress_values(
+        [cnt for codon, cnt in sorted(
+            [(codon, cnt) for codon, cnt in char_count.items()])]))
+
+bits.extend(encode(codons_iterator(genome), char_code_map))
+
+print(f"{len(bits)} bits => {len(bits)//8} bytes")
+
 exit()
 
 
