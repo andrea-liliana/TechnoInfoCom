@@ -77,6 +77,19 @@ def LZ77_decoder(encoded):
     return decoded
 
 
+def LZ77_decoder(encoded):
+    decoded = []
+    for d, l, c in encoded:
+        if l > 0:
+            ofs = len(decoded) - d
+            for i in range(l):
+                decoded.append( decoded[ofs+i])
+        decoded.append( c)
+
+    return decoded
+
+
+
 def LZ77_encoder(input_text, SWSIZE):
     """ Return a list of (distance, length, character) tuples.
     """

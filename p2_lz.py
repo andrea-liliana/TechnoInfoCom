@@ -7,7 +7,7 @@ from collections import Counter
 import numpy as np
 import matplotlib.pyplot as plt
 
-from p2_LZ77 import LZ77_encoder
+from p2_LZ77 import LZ77_encoder, LZ77_decoder
 
 INPUT_FILE = "genome.txt"
 CODON_LEN = 3
@@ -46,11 +46,11 @@ class Node:
         return self.weight < other.weight
 
 
-def build_huffman_tree(codons_cnt: dict):
+def build_huffman_tree(symbols_cnts: dict):
     # Create leaves of the tree
     nodes = []
-    for codon, cnt in codons_cnt.items():
-        nodes.append((cnt, Node(None, None, cnt, codon)))
+    for symbol, cnt in symbols_cnts.items():
+        nodes.append((cnt, Node(None, None, cnt, symbol)))
 
     # Order leaves by weights, heapq is a min-heap
     heapq.heapify(nodes)
@@ -118,7 +118,8 @@ algorithm (see State of the art in data compression, slide
 """
 
 def bits_to_represent(nb_values):
-    # Disontinuous ! == 0 in x==1 !
+    # Disontinuous ! f == 0 in x==1 !
+    assert nb_values >= 1
     return math.ceil(math.log2(nb_values))
 
 def code_binary_char(c):
@@ -216,47 +217,61 @@ def online_lz_decompress(coded_bin, decode_char):
 
 from bitarray import bitarray
 
-def compress_values(values):
-    m = bits_to_represent(max(values))
-    fmt = f"{{:0{m}b}}"
-    bits = bitarray()
-    for v in values:
-        bits.extend(bitarray(fmt.format(v)))
-    return bits, m
-
-def decompress_values(bits, nb_values, bits_per_value):
-    return [int(bits[i*bits_per_value:(i+1)*bits_per_value].to01(), 2) for i in range(nb_values) ]
-
 def int32_to_bits(i):
     return bitarray(f"{i:032b}")
 
-def compress_counts( counts):
-    bits_k,btr_k = compress_values(counts.keys())
-    bits_v,btr_v = compress_values(counts.values())
+def compress_values(values):
+    bits_per_value = bits_to_represent(max(values)+1) # +1 is tricky ! We assume we encode values 0 to max ! FIXME !
+    print(f"Compress: bits_per_value={bits_per_value}, nb_values={len(values)} [{min(values)}, {max(values)}]")
 
-    bits = int32_to_bits(btr_k)
-    bits.extend(int32_to_bits(btr_v))
-    bits.extend(int32_to_bits(len(counts)))
-    bits.extend(bits_k)
-    bits.extend(bits_v)
+    bits = bitarray()
+    bits.extend(int32_to_bits(bits_per_value))
+    bits.extend(int32_to_bits(len(values)))
+
+    fmt = f"{{:0{bits_per_value}b}}"
+    for v in values:
+        bits.extend(bitarray(fmt.format(v)))
+    return bits
+
+def decompress_values(bits):
+    bits_per_value = int(bits[0:32].to01(), 2)
+    nb_values = int(bits[32:64].to01(), 2)
+
+    print(f"Decompress: bits_per_value={bits_per_value}, nb_values={nb_values}")
+    # Return bits read, decompressed counts dictionary
+    return 64 + bits_per_value*nb_values, \
+        [int(bits[i:i+bits_per_value].to01(), 2)
+         for i in range(64,64+nb_values*bits_per_value, bits_per_value) ]
+
+
+def compress_counts(counts):
+    # for v in counts.keys():
+    #     assert v > 0, "0 is reserved for end of stream symbol"
+
+    bits = bitarray()
+    bits.extend(compress_values(counts.keys()))
+    bits.extend(compress_values(counts.values()))
     return bits
 
 def decompress_counts(bits):
-    btr_k = int(bits[0:32].to01(),2)
-    btr_v = int(bits[32:64].to01(),2)
-    length = int(bits[64:96].to01(),2)
+    total_read_bits = 0
+    read_bits, k = decompress_values(bits[total_read_bits:])
+    total_read_bits += read_bits
+    read_bits, v = decompress_values(bits[total_read_bits:])
+    total_read_bits += read_bits
 
-    nk = btr_k * length
-    nv = btr_v * length
+    # Return bits read, decompressed counts dictionary
+    return total_read_bits, dict(zip(k,v))
 
-    k = [int(bits[96+i:96+i+btr_k].to01(),2) for i in range(0,nk, btr_k)]
-    v = [int(bits[96+i:96+i+btr_k].to01(),2) for i in range(nk,nk+nv, btr_v)]
+# Test compress values
+bits = compress_values([1,2,3,4,5,6,7,8,9,10])
+decomp_bits, values = decompress_values(bits)
+assert decomp_bits == len(bits)
 
-    return dict(zip(k,v))
-
-print(compress_values([1,2,3]))
-print(decompress_values(compress_values([1,2,3])[0], 3, 2))
-print(decompress_counts(compress_counts({1:2, 10:11, 12:13})))
+# Test compress counts
+bits = compress_counts({1:2, 10:11, 12:256})
+decomp_bits, cmap = decompress_counts(bits)
+assert decomp_bits == len(bits), f"{decomp_bits} != {len(bits)}"
 
 
 if False:
@@ -293,8 +308,9 @@ def codons_iterator(genome):
 
 
 def encode(symbol_iter, code_map):
-    """ Convert a serie of symbol into a serie of
-    corresponding codewords.
+    """ Convert a serie of symbols into a serie of
+    corresponding codewords (expected to be string
+    representation of binary codes, eg 001100).
 
     - symbol_iter : an iterator which will give all
     the symbols of the data to compress, on by one,
@@ -313,10 +329,45 @@ def encode(symbol_iter, code_map):
     return file_str.getvalue()
 
 
-def decode(genome, decode_map):
+# class StringStore:
+#     def __init__(self):
+#         self._store = StringIO()
+
+#     def write(self, symbol)):
+#         self._store.write(symbol)
+
+#     def value(self):
+#         return self._store.getvalue()
+
+
+# class SymbolStore:
+#     def __init__(self):
+#         self._store = StringIO()
+
+#     def write(self, symbol)):
+#         self._store.write(symbol)
+
+#     def value(self):
+#         return self._store.getvalue()
+
+def decode_one_symbol(compressed, decode_map):
+    prefix = ""
+    for c in compressed:
+        if c:
+            prefix += "1"
+        else:
+            prefix += "0"
+
+        if prefix in decode_map:
+            return len(prefix), decode_map[prefix]
+
+    raise Exception("EOF unexpected")
+
+def decode(genome, decode_map, nb_symbols = 2**31):
     # File end is detected by file size. See remark in
     # encode() funtcion.
 
+    ns = 0
     prefix = ""
     file_str = StringIO()
     for c in compressed:
@@ -324,6 +375,12 @@ def decode(genome, decode_map):
         if prefix in decode_map:
             file_str.write(decode_map[prefix])
             prefix = ""
+
+            if ns < nb_symbols-1:
+                ns += 1
+            else:
+                break
+
     return file_str.getvalue()
 
 
@@ -332,8 +389,10 @@ the corresponding binary Huffman code and the encoded genome.
 Give the total length of the encoded genome and the compression rate. """
 
 genome = "".join(np.genfromtxt("genome.txt", dtype='str'))
+codons_cnt = Counter(codons_iterator(genome))
+CODONS = sorted(codons_cnt.keys())
+
 if True:
-    codons_cnt = Counter(codons_iterator(genome))
 
     top_node = build_huffman_tree(codons_cnt)
     code_map, decode_map = build_codebooks(top_node)
@@ -383,7 +442,7 @@ def tuples_iterator(tuples):
     for t in tuples:
         yield t
 
-#genome=genome[:1000*CODON_LEN]
+#genome=genome[:16*CODON_LEN]
 
 genome_as_codons = [c for c in codons_iterator(genome)]
 print(f"{len(genome_as_codons)} codons")
@@ -391,15 +450,31 @@ print(f"{len(genome_as_codons)} codons")
 import os.path
 import pickle
 
-WIN_SIZE = 512*4
+WIN_SIZE = 512*2
 CACHE_NAME=f"LZ77Cache{WIN_SIZE}.dat"
 if not os.path.exists(CACHE_NAME):
+    print("Crunching with LZ77")
     tuples = LZ77_encoder(genome_as_codons, WIN_SIZE)
     with open(CACHE_NAME,"wb") as fout:
         pickle.dump(tuples, fout)
 else:
     with open(CACHE_NAME,"rb") as fin:
         tuples = pickle.load(fin)
+
+print("Decrunching with LZ77")
+res = LZ77_decoder(tuples)
+print(f"Length decompressed={len(res)}, expected={len(genome)}")
+# print(" ".join([ genome[i:i+CODON_LEN] for i in range(0,len(genome),CODON_LEN)]))
+# print(res)
+# for t in tuples:
+#     print(t)
+
+
+print()
+
+assert "".join(res) == genome
+
+
 
 compressed_size = len(tuples)*(10+10+6) # 10 bits for distance, 10 bits for length, 6 bits for codon.
 print(f"LZ77 only : {len(tuples)} tuples -> {compressed_size} bits => {compressed_size / len(genome_as_codons):.1f} bits per codon")
@@ -416,7 +491,7 @@ plt.plot(list(sorted(tuples_count.values())))
 print(f"\n\n2. build_huffman_tree on {len(tuples)} tuples (of which {len(tuples_count)} are unique)")
 
 
-tree_size = len(tuples_count) * (bits_to_represent(len(small_c)) + bits_to_represent(max(small_d)) + bits_to_represent(max(small_l)) + bits_to_represent(len(tuples_count)))
+tree_size = len(tuples_count) * (bits_to_represent(len(small_c)) + bits_to_represent(max(small_d)+1) + bits_to_represent(max(small_l)+1) + bits_to_represent(len(tuples_count)))
 print(f"Tree size = {tree_size} bits => {tree_size//8} bytes")
 
 
@@ -430,26 +505,28 @@ print("Compressed size = {} bits => {:.1f} bits per codons".format(compressed_si
 
 dist_count = Counter(small_d)
 len_count = Counter(small_l)
-char_count = Counter(small_c)
+
+c = Counter(small_c)
+char_count = dict(zip(CODONS, [c[codon] for codon in CODONS]))
 
 plt.figure()
 plt.plot(list(dist_count.values()))
 plt.xlabel("Distances")
 plt.ylabel("# occurences")
-plt.show()
+#plt.show()
 
 plt.figure()
 plt.plot(list(len_count.values()))
 plt.xlabel("Lengths")
 plt.ylabel("# occurences")
-plt.show()
+#plt.show()
 
 top_node = build_huffman_tree(dist_count)
 dist_code_map, dist_decode_map = build_codebooks(top_node)
 
-dist_tree_size = len(dist_count) * (bits_to_represent(max(dist_count.values())) + bits_to_represent(max(dist_count.keys())))
-len_tree_size = len(len_count) * (bits_to_represent(max(len_count.values())) + bits_to_represent(max(len_count.keys())))
-char_tree_size = len(char_count) * bits_to_represent(max(char_count.values()))
+dist_tree_size = len(dist_count) * (bits_to_represent(max(dist_count.values())+1) + bits_to_represent(max(dist_count.keys())+1))
+len_tree_size = len(len_count) * (bits_to_represent(max(len_count.values())+1) + bits_to_represent(max(len_count.keys())+1))
+char_tree_size = len(char_count) * bits_to_represent(max(char_count.values())+1)
 
 all_trees_size = dist_tree_size + len_tree_size + char_tree_size
 
@@ -470,10 +547,16 @@ compressed_size = sum([len(char_code_map[c]) + len(len_code_map[l]) + len(dist_c
 print("Compressed size = {} bits {} bytes => {:.1f} bits per codons".format(compressed_size, compressed_size//8, compressed_size / len(genome_as_codons)))
 plt.figure()
 plt.plot(list(sorted(char_count.values())))
-plt.show()
+#plt.show()
 
 
 # --------------------------------------------------------------------
+
+def tuples_value_iterator(tuples, idx):
+    for t in tuples:
+        yield t[idx]
+
+# Compression ************************************************
 
 bits = bitarray()
 bits.extend(compress_counts(dist_count))
@@ -483,15 +566,76 @@ bits.extend(compress_counts(len_count))
 # sorted in codons order. This willl esae the decompression
 # And prevent us to store the codons values themselves.
 
-assert len(char_count) == 64, f"FIXME Simplifcation, all codons must show up {len(char_count)}"
+assert len(char_count) == 64, f"FIXME Simplifcation, all codons must show up, I count {len(char_count)} out of {4**CODON_LEN}"
 bits.extend(
     compress_values(
-        [cnt for codon, cnt in sorted(
-            [(codon, cnt) for codon, cnt in char_count.items()])]))
+        [char_count[codon] for codon in CODONS]))
 
-bits.extend(encode(codons_iterator(genome), char_code_map))
+# for i, code_map in enumerate([dist_code_map, len_code_map, char_code_map]):
+#     binstring = encode(tuples_value_iterator(tuples, i), code_map)
+#     bits.extend(bitarray(binstring))
+
+
+for d,l,c in tuples:
+    bits.extend(bitarray(dist_code_map[d]))
+    bits.extend(bitarray(len_code_map[l]))
+    bits.extend(bitarray(char_code_map[c]))
 
 print(f"{len(bits)} bits => {len(bits)//8} bytes")
+
+
+# Decompression ************************************************
+
+total_read_bits = 0
+read_bits, dist_count = decompress_counts(bits)
+total_read_bits += read_bits
+read_bits, len_count = decompress_counts(bits[total_read_bits:])
+total_read_bits += read_bits
+read_bits, char_count = decompress_values(bits[total_read_bits:])
+char_count = dict(zip(CODONS, char_count))
+total_read_bits += read_bits
+
+print(len(dist_count))
+print(len(len_count))
+print(len(char_count))
+
+assert sum(dist_count.values()) == sum(len_count.values()) == sum(char_count.values()) == len(tuples)
+
+top_node = build_huffman_tree(dist_count)
+dist_code_map, dist_decode_map = build_codebooks(top_node)
+top_node = build_huffman_tree(len_count)
+len_code_map, len_decode_map = build_codebooks(top_node)
+top_node = build_huffman_tree(char_count)
+char_code_map, char_decode_map = build_codebooks(top_node)
+
+dtuples = []
+for i in range(sum(dist_count.values())):
+    read_bits, d = decode_one_symbol(bits[total_read_bits:total_read_bits+100], dist_decode_map)
+    total_read_bits += read_bits
+    read_bits, l = decode_one_symbol(bits[total_read_bits:total_read_bits+100], len_decode_map)
+    total_read_bits += read_bits
+    read_bits, c = decode_one_symbol(bits[total_read_bits:total_read_bits+100], char_decode_map)
+    total_read_bits += read_bits
+    dtuples.append((d,l,c))
+
+    if len(dtuples) % 10000 == 0:
+        print(len(dtuples))
+print(total_read_bits)
+print(len(dtuples))
+
+res = LZ77_decoder(dtuples)
+print(len(res))
+print(len(genome))
+
+assert len(tuples) == len(dtuples)
+for i in range(len(tuples)):
+    #print(dtuples[i], tuples[i])
+    assert dtuples[i][0] == tuples[i][0]
+    assert dtuples[i][1] == tuples[i][1]
+    assert dtuples[i][2] == tuples[i][2], f"{tuples[i]} != {dtuples[i]}"
+
+assert "".join(res) == genome
+
 
 exit()
 
