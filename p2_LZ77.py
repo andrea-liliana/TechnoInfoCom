@@ -1,92 +1,81 @@
-def LZ77_old(input_text, l, look_ahead_length):
+# def LZ77_old(input_text, l, look_ahead_length):
 
-    sliding_window = l
-    encoded = []
-    searchBuffer = ""
-    look_ahead_buffer = input_text[:look_ahead_length]
-    input_text = input_text[look_ahead_length:]
+#     sliding_window = l
+#     encoded = []
+#     searchBuffer = ""
+#     look_ahead_buffer = input_text[:look_ahead_length]
+#     input_text = input_text[look_ahead_length:]
 
-    while len(look_ahead_buffer) > 0:
+#     while len(look_ahead_buffer) > 0:
 
-        tmpSubstring = look_ahead_buffer[:-1]
-        while(len(tmpSubstring) > 1):
+#         tmpSubstring = look_ahead_buffer[:-1]
+#         while(len(tmpSubstring) > 1):
 
-            # prefix := longest prefix of input that begins in window
-            prefix = findLongestPrefix(searchBuffer, tmpSubstring)
-            # if prefix exists in window then
-            if(prefix != -1):
-                # d := distance to the start of the prefix
-                d = len(searchBuffer) - prefix
-                # l := length of prefix
-                l = len(prefix)
+#             # prefix := longest prefix of input that begins in window
+#             prefix = findLongestPrefix(searchBuffer, tmpSubstring)
+#             # if prefix exists in window then
+#             if(prefix != -1):
+#                 # d := distance to the start of the prefix
+#                 d = len(searchBuffer) - prefix
+#                 # l := length of prefix
+#                 l = len(prefix)
 
-                break
+#                 break
 
-            else:
-                # c := first symbol of input
-                tmpSubstring = tmpSubstring[0]
-                # d and l equal to 0
-                d = 0
-                l = 0
+#             else:
+#                 # c := first symbol of input
+#                 tmpSubstring = tmpSubstring[0]
+#                 # d and l equal to 0
+#                 d = 0
+#                 l = 0
 
-        # c := char following the prefix in input
-        c = look_ahead_buffer[l]
+#         # c := char following the prefix in input
+#         c = look_ahead_buffer[l]
 
-        #append (d, l, c) to encoded input
-        encoded.append((d, l, c))
+#         #append (d, l, c) to encoded input
+#         encoded.append((d, l, c))
 
-        # shift the sliding window by l + 1 symbols
-        sliding_window = l + 1
-        # discard l + 1 symbols from the beginning of window and add the l + 1
-        # first symbols of the input at the end of the window
-        look_ahead_buffer = look_ahead_buffer[sliding_window:]
-        look_ahead_buffer = look_ahead_buffer + input_text[:sliding_window]
-        input_text = input_text[l + 1:]
+#         # shift the sliding window by l + 1 symbols
+#         sliding_window = l + 1
+#         # discard l + 1 symbols from the beginning of window and add the l + 1
+#         # first symbols of the input at the end of the window
+#         look_ahead_buffer = look_ahead_buffer[sliding_window:]
+#         look_ahead_buffer = look_ahead_buffer + input_text[:sliding_window]
+#         input_text = input_text[l + 1:]
 
-    return encoded
-
-
-def findLongestPrefix(text, char):
-    index = 0
-    if char in text:
-        c = char[0]
-        for ch in text:
-            if ch == c:
-                if text[index:index+len(char)] == char:
-                    return index
-
-            index = index + 1
-
-    return -1
+#     return encoded
 
 
-def LZ77_decoder(encoded):
+# def findLongestPrefix(text, char):
+#     index = 0
+#     if char in text:
+#         c = char[0]
+#         for ch in text:
+#             if ch == c:
+#                 if text[index:index+len(char)] == char:
+#                     return index
 
-    decoded = ""
-    for code in encoded:
-        d = code[0]
-        l = code[1]
-        if (d == 0):
-            decoded = decoded + code[2]
-        else:
-            start = len(decoded) - d
-            end = start + l
-            added = decoded[start:end]
-            added = added[:l]
-            decoded = decoded + added + code[2]
-    return decoded
+#             index = index + 1
+
+#     return -1
 
 
-def LZ77_decoder(encoded):
-    decoded = []
-    for d, l, c in encoded:
-        if l > 0:
-            ofs = len(decoded) - d
-            for i in range(l):
-                decoded.append( decoded[ofs+i])
-        decoded.append( c)
+# def LZ77_decoder(encoded):
 
-    return decoded
+#     decoded = ""
+#     for code in encoded:
+#         d = code[0]
+#         l = code[1]
+#         if (d == 0):
+#             decoded = decoded + code[2]
+#         else:
+#             start = len(decoded) - d
+#             end = start + l
+#             added = decoded[start:end]
+#             added = added[:l]
+#             decoded = decoded + added + code[2]
+#     return decoded
+
 
 
 
@@ -145,7 +134,9 @@ def LZ77_encoder(input_text, SWSIZE):
                 longest_prefix_pos = pfx_start
                 longest_prefix_len = pfx_len
 
-        if longest_prefix_len > 0:
+        # We take prefix of length 2 or more else they are
+        # just a regular single symbol and not worht a repetition.
+        if longest_prefix_len > 1:
             # print("long")
             d, l, c = i - longest_prefix_pos, longest_prefix_len, input_text[i + longest_prefix_len]
         else:
@@ -157,6 +148,25 @@ def LZ77_encoder(input_text, SWSIZE):
 
     return compressed
 
+
+
+def LZ77_decoder(encoded):
+    decoded = []
+    for d, l, c in encoded:
+        if l > 0:
+            ofs = len(decoded) - d
+
+            # This loop to allow symbol repetitions
+            # to be defined past the end of the
+            # sliding window
+
+            for i in range(l):
+                decoded.append(decoded[ofs+i])
+        decoded.append(c)
+
+    return decoded
+
+
 if __name__ == "__main__":
     S = "abracadabrad"
     print(S)
@@ -166,9 +176,9 @@ if __name__ == "__main__":
     genome = np.genfromtxt("genome.txt",dtype='str')
     genome = "".join(genome)
 
-    print("Compressing")
+    print("Compressing full genome")
     compressed = LZ77_encoder(genome, 1024 // 2)
     print(f"Compression has {len(compressed)} tuples")
     print("Decompressing")
     decompressed = LZ77_decoder(compressed)
-    assert decompressed == genome
+    assert "".join(decompressed) == genome
