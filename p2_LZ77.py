@@ -115,11 +115,12 @@ def LZ77_encoder(input_text, SWSIZE):
             pfx_len = 0
             prefix = ""
 
-            # Actually, the prefix must fit inside the sliding
-            # window and the lookahead must not got past EOF.
+            # The first condition is here to avoid going past EOF.
+            # The second is for extending the repeated part.
+            # Note that the repeated string can go past the sliding
+            # window.
 
-            while pfx_start + pfx_len < i and\
-                  i+pfx_len < len(input_text) - 1 and\
+            while i+pfx_len < len(input_text) - 1 and\
                   peek(pfx_start + pfx_len) == peek(i+pfx_len):
 
                 prefix += peek(pfx_start+pfx_len)
@@ -137,13 +138,11 @@ def LZ77_encoder(input_text, SWSIZE):
         # We take prefix of length 2 or more else they are
         # just a regular single symbol and not worht a repetition.
         if longest_prefix_len > 1:
-            # print("long")
             d, l, c = i - longest_prefix_pos, longest_prefix_len, input_text[i + longest_prefix_len]
         else:
             d, l, c = 0, 0, input_text[i]
 
-        compressed.append( (d,l,c) )
-        #print(f"Ofs:{d}, len:{l}, char:{c}")
+        compressed.append((d, l, c))
         i += l + 1
 
     return compressed
