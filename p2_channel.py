@@ -131,7 +131,7 @@ plt.title("Decoded wave, no error correction, with noise")
 plt.show()
 
 # QUESTION 20
-""" 20. How would you proceed to reduce the loss of information and/or
+""" Q20. How would you proceed to reduce the loss of information and/or
 to improve the communication rate? Justify. """
 
 """

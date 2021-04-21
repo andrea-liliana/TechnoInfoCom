@@ -107,11 +107,8 @@ def LZ77_encoder(input_text, SWSIZE):
         # the one we use is trickier, it's because in the TA's example
         # he goes the other way around (right to left)...
 
-        r = range(i-1, i-SWSIZE-1, -1)
+        for pfx_start in range(i-1, i-SWSIZE-1, -1):
 
-        for pfx_start in r:
-
-            # Try all prefixes starting at pfx_start
             pfx_len = 0
             prefix = ""
 
@@ -155,21 +152,30 @@ def LZ77_decoder(encoded):
         if l > 0:
             ofs = len(decoded) - d
 
-            # This loop to allow symbol repetitions
+            # This loop allows symbol repetitions
             # to be defined past the end of the
-            # sliding window
+            # sliding window.
 
             for i in range(l):
                 decoded.append(decoded[ofs+i])
+
         decoded.append(c)
 
     return decoded
 
 
 if __name__ == "__main__":
+    """ Q4. Implement a function that returns the encoded sequence using the
+    LZ77 algorithm as described by Algorithm 1 given an input string
+    and a sliding window size l. Reproduce the example given in Figure
+    2 with l = 7."""
+
     S = "abracadabrad"
     print(S)
     print(LZ77_encoder(S, 7))
+
+    """ Q10. Encode the genome using the LZ77 algorithm. Give the total
+    length of the encoded genome and the compression rate."""
 
     import numpy as np
     genome = np.genfromtxt("genome.txt",dtype='str')

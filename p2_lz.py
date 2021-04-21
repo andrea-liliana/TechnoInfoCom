@@ -79,18 +79,11 @@ def compute_leaves_codes(node: Node, prefix=""):
         node.code = prefix
         return [node]
 
-
-ex7_freq = [0.05, 0.10, 0.15, 0.15, 0.2, 0.35]
-symbols = [f"{x:.2f}" for x in ex7_freq]
-top_node = build_huffman_tree(dict(zip(symbols, ex7_freq)))
-leaves = compute_leaves_codes(top_node)
-
-
 def gid(node):
     return f"{int(id(node))}"
 
-
 def draw_neato_tree(fout, node):
+
     if node.has_both_children():
         fout.write(f"{gid(node)} [label=\"{node.weight:.2f}\"]\n")
 
@@ -100,6 +93,12 @@ def draw_neato_tree(fout, node):
         draw_neato_tree(fout, node.right_child)
     else:
         fout.write(f"{gid(node)} [label=\"{node.symbol}\\n{node.code}\"]\n")
+
+
+ex7_freq = [0.05, 0.10, 0.15, 0.15, 0.2, 0.35]
+symbols = [f"{x:.2f}" for x in ex7_freq]
+top_node = build_huffman_tree(dict(zip(symbols, ex7_freq)))
+leaves = compute_leaves_codes(top_node)
 
 
 with open("graph.dot", "w") as fout:
@@ -353,6 +352,7 @@ def encode(symbol_iter, code_map):
 def decode_one_symbol(compressed, decode_map):
     prefix = ""
     for c in compressed:
+        assert c in (True, False), f"Unexpected char : {c}"
         if c:
             prefix += "1"
         else:
@@ -384,9 +384,10 @@ def decode(genome, decode_map, nb_symbols = 2**31):
     return file_str.getvalue()
 
 
-""" 5. Estimate the marginal probability distribution of all codons from the given genome, and determine
-the corresponding binary Huffman code and the encoded genome.
-Give the total length of the encoded genome and the compression rate. """
+""" Q5. Estimate the marginal probability distribution of all codons
+from the given genome, and determine the corresponding binary Huffman
+code and the encoded genome.  Give the total length of the encoded
+genome and the compression rate. """
 
 genome = "".join(np.genfromtxt("genome.txt", dtype='str'))
 codons_cnt = Counter(codons_iterator(genome))
@@ -444,11 +445,24 @@ def tuples_iterator(tuples):
 
 #genome=genome[:16*CODON_LEN]
 
+# Split the genom into codons.
+# FIXME Try splitting the genome into letters : G,T,C,A
+# But not correct yet to compare to gzip : G,T,C,A will be 4 symbols => 2 bits per letter :-)
+# But gzip doesn't know that, it sees bytes => 8 bits per letter !
+
+# G  A  T  A  C  A GT ACAGT GTGAACCTA
+# 00 01 11 00 10 01
+# G,A,T,A,A,G,TACA
+#
+
 genome_as_codons = [c for c in codons_iterator(genome)]
 print(f"{len(genome_as_codons)} codons")
 
 import os.path
 import pickle
+
+""" Q10. Encode the genome using the LZ77 algorithm. Give the total
+length of the encoded genome and the compression rate."""
 
 WIN_SIZE = 512*2
 CACHE_NAME=f"LZ77Cache{WIN_SIZE}.dat"
@@ -464,16 +478,13 @@ else:
 print("Decrunching with LZ77")
 res = LZ77_decoder(tuples)
 print(f"Length decompressed={len(res)}, expected={len(genome)}")
-# print(" ".join([ genome[i:i+CODON_LEN] for i in range(0,len(genome),CODON_LEN)]))
-# print(res)
-# for t in tuples:
-#     print(t)
+assert "".join(res) == genome, "LZ77 compression wen wrong"
 
 
-print()
-
-assert "".join(res) == genome
-
+"""Q12. Encode the genome using the best (according to your answer in
+the previous question) combination of LZ77 and Huffman
+algorithms. Give the total length of the encoded genome and the
+compression rate."""
 
 
 compressed_size = len(tuples)*(10+10+6) # 10 bits for distance, 10 bits for length, 6 bits for codon.
@@ -503,7 +514,7 @@ print("Compressed size = {} bits => {:.1f} bits per codons".format(compressed_si
 # --------------------------------------------------------------------
 # (l,d,c) -> (l,c) + (d)
 
-dist_count = Counter(small_d)
+dist_count = Counter(small_d) # 1 -> 001 ,2->110,3->1110,2,5,1,1,1,1,1,4,6,...,1000 -> dict( symbol -> count)
 len_count = Counter(small_l)
 
 c = Counter(small_c)
@@ -547,7 +558,7 @@ compressed_size = sum([len(char_code_map[c]) + len(len_code_map[l]) + len(dist_c
 print("Compressed size = {} bits {} bytes => {:.1f} bits per codons".format(compressed_size, compressed_size//8, compressed_size / len(genome_as_codons)))
 plt.figure()
 plt.plot(list(sorted(char_count.values())))
-#plt.show()
+plt.show()
 
 
 # --------------------------------------------------------------------
@@ -571,12 +582,17 @@ bits.extend(
     compress_values(
         [char_count[codon] for codon in CODONS]))
 
+LETTER = ['A','T','C','A']
+
 # for i, code_map in enumerate([dist_code_map, len_code_map, char_code_map]):
 #     binstring = encode(tuples_value_iterator(tuples, i), code_map)
 #     bits.extend(bitarray(binstring))
 
 
 for d,l,c in tuples:
+    # Compress a tuple (d,l,c) into its huffman representation
+    # (d -> 0101..., l -> 11000, c->101010), using a different
+    # codebook for d,l and c.
     bits.extend(bitarray(dist_code_map[d]))
     bits.extend(bitarray(len_code_map[l]))
     bits.extend(bitarray(char_code_map[c]))
@@ -610,6 +626,10 @@ char_code_map, char_decode_map = build_codebooks(top_node)
 
 dtuples = []
 for i in range(sum(dist_count.values())):
+    # total_read_bits+100 : make sure we don't pass all the remaining
+    # of bit array to decode_one_symbol function each time => it's
+    # speed optimisation.
+
     read_bits, d = decode_one_symbol(bits[total_read_bits:total_read_bits+100], dist_decode_map)
     total_read_bits += read_bits
     read_bits, l = decode_one_symbol(bits[total_read_bits:total_read_bits+100], len_decode_map)
@@ -639,6 +659,9 @@ assert "".join(res) == genome
 
 exit()
 
+
+""" Q9. Encode the genome using the on-line Lempel-Ziv algorithm. Give
+the total length of the encoded genome and the compression rate."""
 
 # Online LZ algorithm
 
@@ -742,15 +765,38 @@ Question 11 :
 11. Famous data compression algorithms combine the LZ77 algorithm and the Huffman algorithm.
 Explain how these algorithms can be combined and discuss the interest of the possible combinations.
 
-Hello, I have a question regarding question 11. The famous algorithms your talking about are not many. The closest I could find are DEFLATE and zlib (both pretty dated, see LZSA, LZ4, etc). Basically many algorithms use a combination of *variants* of LZ77 (LZ78, LZW,...) and *variants* of Huffman encoding (simple encoding, canonical encoding, double encoding (see deflate), etc.). So I wanted to make it 100% clear that you require us to study how to combine the LZ77 variant (as proposed in the project statement) and the regular Huffman tree construction (as explained in the course), and only those two. Is it correct ?
-
-
-
 A/ Using LZ77 first and Huffman second.
 
 https://stackoverflow.com/questions/55547113/why-to-combine-huffman-and-lz77
 https://cstheory.stackexchange.com/questions/7653/why-does-huffman-coding-eliminate-entropy-that-lempel-ziv-doesnt
 https://www.euccas.me/zlib/
+
+LZ77 is fully deterministic. Sliding window is the only parameter.
+LZ77 produces (distance,length,character) tuples.
+
+Huffman : what input shall we give to huffman ?
+
+First porposal : give it the tuples !
+=> leads good compression about 5.4 bits per CODON.
+BUT the Huffman tree is huge : 100000+ leaves. =>
+the TOTAL compressed size = compressed bits + huffman = is actualy bigger than original file.
+
+(d,l,c) -> [ (d,l), c ]
+
+(d,l,c) -> [d] [l] [c]
+
+950KB to about 280KB
+c = a CODON; NOT a single character
+c = GAT, TAG, CCT, TCA.... NOT c = G, T, C, A
+
+GAT = 3 bytes => 24 bits / per codon
+64 codons => log2 64 = 3 bits / per codon
+
+orignal genome size = 952kb (8 bits/cahracter)
+with codon letters G,T,C,A (2 bits per charcter) instead of char, we shoudl have 952 / 4 = 240kb
+with codon symbols GAT,TCA,ATT,... (6 bits per 3 charcter) instead of char, we shoudl have ((952 / 3)*6)/8 = 238kb
+Stc: 265 kb -> results of 3 steps : change alphabet; LZ77; Huffman.
+gzip : 280 kb
 
 If one assume there is a set of initial symbols, letters for example, then it is possible
 to combine those in bigger symbols if we see repetitions, words for example. Doing, so
