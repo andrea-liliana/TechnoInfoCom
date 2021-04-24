@@ -3,9 +3,12 @@ import math
 import heapq
 from io import StringIO
 from collections import Counter
+import os.path
+import pickle
 
 import numpy as np
 import matplotlib.pyplot as plt
+from bitarray import bitarray
 
 from p2_LZ77 import LZ77_encoder, LZ77_decoder
 
@@ -214,7 +217,6 @@ def online_lz_decompress(coded_bin, decode_char):
     return decoded
 
 
-from bitarray import bitarray
 
 def int32_to_bits(i):
     return bitarray(f"{i:032b}")
@@ -342,27 +344,6 @@ def encode(symbol_iter, code_map):
     return file_str.getvalue()
 
 
-# class StringStore:
-#     def __init__(self):
-#         self._store = StringIO()
-
-#     def write(self, symbol)):
-#         self._store.write(symbol)
-
-#     def value(self):
-#         return self._store.getvalue()
-
-
-# class SymbolStore:
-#     def __init__(self):
-#         self._store = StringIO()
-
-#     def write(self, symbol)):
-#         self._store.write(symbol)
-
-#     def value(self):
-#         return self._store.getvalue()
-
 def decode_one_symbol(compressed, decode_map):
     prefix = ""
     for c in compressed:
@@ -416,9 +397,11 @@ if True:
     assert genome == decode(
         genome, decode_map), "Decompressed data is not the same as compressed data"
 
-    ratio = len(compressed) / (len(genome)*8)
-    print(f"Genome size = {len(genome)*8} bits Compressed size = {len(compressed)} bits; ratio={ratio}")
+    ratio = (len(genome)*8) / len(compressed)
+    print(f"Q5: Genome size = {len(genome)*8}; bits Compressed size = {len(compressed)} bits; ratio={ratio:.2f}")
 
+""" Q6. Give the expected average length for your Huffman code. Compare this value with (a) the empirical average length, and (b) theoretical bound(s). Justify.
+"""
 
 """ For Q7 of Project2, I have two questions.
 
@@ -447,21 +430,11 @@ if False:
         print(f"{len(compressed)} / {len(g)*8} = {len(compressed) / (len(g)*8):.3f}")
 
 
-""" Q12. Encode the genome using the best (according to your answer in
-the previous question) combination of LZ77 and Huffman
-algorithms. Give the total length of the encoded genome and the
-compression rate.
-"""
-
-def tuples_iterator(tuples):
-    for t in tuples:
-        yield t
-
-import os.path
-import pickle
-
 """ Q10. Encode the genome using the LZ77 algorithm. Give the total
 length of the encoded genome and the compression rate."""
+
+# The following code is to avoid recompressing the genome
+# each time we run the program.
 
 WIN_SIZE = 512*2
 CACHE_NAME=f"LZ77Cache{WIN_SIZE}.dat"
@@ -474,10 +447,11 @@ else:
     with open(CACHE_NAME,"rb") as fin:
         tuples = pickle.load(fin)
 
+
 print("Test : Decrunching with LZ77")
 res = LZ77_decoder(tuples)
 print(f"Length decompressed={len(res)} chars, expected={len(genome)} chars")
-assert "".join(res) == genome, "LZ77 compression wen wrong"
+assert "".join(res) == genome, "LZ77 compression went wrong"
 
 
 """Q12. Encode the genome using the best (according to your answer in
@@ -485,8 +459,8 @@ the previous question) combination of LZ77 and Huffman
 algorithms. Give the total length of the encoded genome and the
 compression rate."""
 
-
-compressed_size = len(tuples)*(10+10+6) # 10 bits for distance, 10 bits for length, 6 bits for codon.
+# 10 bits for distance, idem for length, 2 bits per letter.
+compressed_size = len(tuples)*(2*math.log2(WIN_SIZE)+math.log2(4))
 print(f"LZ77 only : {len(tuples)} tuples -> {compressed_size} bits => {compressed_size / len(genome):.1f} bits per symbol")
 
 small_c = [c for d,l,c in tuples]
@@ -577,7 +551,10 @@ for d,l,c in tuples:
     bits.extend(bitarray(len_code_map[l]))
     bits.extend(bitarray(char_code_map[c]))
 
-print(f"{len(bits)} bits => {len(bits)//8} bytes")
+print(f"LZ77+Huffman compression : {len(bits)} bits => {len(bits)//8} bytes. {len(bits)/(len(genome*8)):.2f} on disk compression rate")
+
+rate = (len(genome)/len(bits)) * (math.log2(4)/math.log2(2))
+print(f"Compression rate : ({len(genome)} chars /{len(bits)} bits) * ({math.log2(4)} letters / {math.log2(2)} bits) = {rate:.2f}")
 
 # Decompression ************************************************
 
@@ -603,7 +580,8 @@ for i in range(sum(dist_count.values())):
     # total_read_bits+100 : make sure we don't extract all the remaining
     # of bit array to decode_one_symbol function each time => it's a
     # speed optimisation. We can do it because we assume Huffman codes
-    # won't be more than 100 bits.
+    # won't be more than 100 bits. Ideally we could compute that number
+    # based on Huffman trees themselves.
 
     read_bits, d = decode_one_symbol(bits[total_read_bits:total_read_bits+100], dist_decode_map)
     total_read_bits += read_bits
