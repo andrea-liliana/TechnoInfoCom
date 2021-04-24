@@ -56,6 +56,9 @@ P = 0.01
 bits_to_flip = int(len(bin_encoded)*P)
 print(f"Generating noise : {int(len(bin_encoded)*P)} bits will be flipped out of {len(bin_encoded)}")
 indices = random.sample(range(len(bin_encoded)), bits_to_flip)
+assert len(set(indices)) == bits_to_flip, "Some indices were redundant or not enough indices"
+#print(list(sorted(indices)))
+
 bin_encoded_with_error = bin_encoded.copy()
 for i in indices:
     bin_encoded_with_error[i] = not bin_encoded_with_error[i]
