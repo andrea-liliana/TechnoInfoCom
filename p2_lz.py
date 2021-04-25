@@ -424,7 +424,7 @@ code. Compare this value with (a) the empirical average length, and
 (b) theoretical bound(s). Justify.  """
 
 # Calculate probabilities
-f = 319519
+f = sum(codons_cnt.values())
 for key, value in codons_cnt.items():
     codons_cnt[key] = value/f
 
