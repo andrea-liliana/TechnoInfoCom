@@ -5,6 +5,7 @@ from io import StringIO
 from collections import Counter
 import os.path
 import pickle
+from datetime import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,6 +15,19 @@ from p2_LZ77 import LZ77_encoder, LZ77_decoder
 
 INPUT_FILE = "genome.txt"
 CODON_LEN = 3
+
+
+def entropy(a):
+    s = sum(a)
+    h = 0
+    for x in a:
+        p = x/s
+        h += p*math.log2(p)
+    return - h
+
+#ABABAC -> A,B,C ou AB AC
+print(entropy([3,2,1]) / math.log2(3))
+print(entropy([2,1]) / math.log2(2))
 
 
 """ Q1 Implement a function that returns a binary Huffman code for a given probability distribution. Give
@@ -219,6 +233,7 @@ def online_lz_decompress(coded_bin, decode_char):
 
 
 def int32_to_bits(i):
+    # We take 32 bits to be safe.
     return bitarray(f"{i:032b}")
 
 def compress_values(values):
@@ -258,7 +273,6 @@ def decompress_values(bits, as_type='int'):
     # Return bits read, decompressed counts dictionary
     return 64 + bits_per_value*nb_values, v
 
-
 def compress_counts(counts):
     # for v in counts.keys():
     #     assert v > 0, "0 is reserved for end of stream symbol"
@@ -279,7 +293,7 @@ def decompress_counts(bits, as_type='int'):
     return total_read_bits, dict(zip(k,v))
 
 # Test compress values
-bits = compress_values([1,2,3,4,5,6,7,8,9,10])
+bits = compress_values([1,2,3,4,5,6,7,8,9,10,100,101,102,103,256])
 decomp_bits, values = decompress_values(bits)
 assert decomp_bits == len(bits)
 
@@ -388,6 +402,9 @@ genome = "".join(np.genfromtxt("genome.txt", dtype='str'))
 codons_cnt = Counter(codons_iterator(genome))
 CODONS = sorted(codons_cnt.keys())
 
+print(entropy(Counter(genome).values()))
+print(entropy(codons_cnt.values()))
+
 if True:
 
     top_node = build_huffman_tree(codons_cnt)
@@ -398,10 +415,14 @@ if True:
         genome, decode_map), "Decompressed data is not the same as compressed data"
 
     ratio = (len(genome)*8) / len(compressed)
-    print(f"Q5: Genome size = {len(genome)*8}; bits Compressed size = {len(compressed)} bits; ratio={ratio:.2f}")
+    print(f"Q5: Genome size = {len(genome)*8} bits; Compressed size = {len(compressed)} bits; ratio={ratio:.2f}")
 
-""" Q6. Give the expected average length for your Huffman code. Compare this value with (a) the empirical average length, and (b) theoretical bound(s). Justify.
-"""
+""" Q6. Give the expected average length for your Huffman
+code. Compare this value with (a) the empirical average length, and
+(b) theoretical bound(s). Justify.  """
+
+
+
 
 """ For Q7 of Project2, I have two questions.
 
@@ -430,28 +451,132 @@ if False:
         print(f"{len(compressed)} / {len(g)*8} = {len(compressed) / (len(g)*8):.3f}")
 
 
+
+""" Q9. Encode the genome using the on-line Lempel-Ziv algorithm. Give
+the total length of the encoded genome and the compression rate."""
+
+def online_lz_encode(genome):
+    coded_message = []
+    coded_bin = StringIO()
+
+    prefix = ""
+    prefixes = {"": 0}
+
+    EOF_MARK = ''
+
+    # The whole point of this trickery is to detect
+    # EOF one char ahead. This way we can tell when
+    # we're processing the last character of the
+    # input file
+
+    c = genome.read(1)  # Read one byte
+    assert c != EOF_MARK, "Compressing empty file is not supported"
+    next_char = genome.read(1)
+    eof = next_char == EOF_MARK
+
+    while True:
+        if not eof and prefix + c in prefixes:
+            prefix = prefix + c
+        else:
+            # Either EOF on next char,
+            # either prefix+c not in prefixes.
+
+            # In both case we store the prefix+c. That's
+            # especially useful when EOF is met since it
+            # allows us to termiante the output stream cleanly.
+
+            # Number of bits necessary to represent the length
+            # of the prefixes table.
+            # FIXME this is not really fast.
+            l = math.ceil(math.log2(len(prefixes)))
+            if l == 0:
+                l = 1
+
+            # Append (prefix's number, c) to the output stream .
+            # c is stored as an ASCCI character (8 bits) eventhough it
+            # is not very efficient.
+            coded_bin.write(f"{np.binary_repr(prefixes[prefix],l)}{ord(c):08b}")
+
+            # Record the new prefix and give it a number
+            prefixes[prefix + c] = len(prefixes)
+            prefix = ""
+
+        if next_char != EOF_MARK:
+            c = next_char
+            next_char = genome.read(1)
+            eof = next_char == EOF_MARK
+        else:
+            break
+
+    return coded_bin.getvalue()
+
+
+def online_lz_decode(coded_bin):
+    ndx = 0
+    decoded = StringIO()
+    prefixes = {0: ""}
+    while ndx < len(coded_bin):
+        l = math.ceil(math.log2(len(prefixes)))
+        if l == 0:
+            l = 1
+        prefix_code = int(coded_bin[ndx:ndx+l], 2)
+
+        #print(f"ndx:{ndx}, l:{l}, len pfx:{len(prefixes)}, pfx code:{prefix_code}")
+        c = chr(int(coded_bin[ndx+l:ndx+l+8], 2))
+        # c = coded_bin[ndx+l:ndx+l+1]
+
+        decoded.write(prefixes[prefix_code] + c)
+        # print(l,prefix_code,c,decoded)
+
+        prefixes[len(prefixes)] = prefixes[prefix_code] + c
+        ndx = ndx+l+8
+    return decoded.getvalue()
+
+
+coded_bin = online_lz_encode(StringIO(genome))
+decoded = online_lz_decode(coded_bin)
+assert decoded == genome, "something went wrong in the compression or decompression"
+
+print(f"Q9: total length of source genome, without spaces : {len(genome)} symbols, {len(genome)*8} bits")
+print(f"Q9: total length of encoded genome : {len(coded_bin)} bits")
+print(f"Q9: compression rate (lecture 4, slide 18) : {len(genome*8)} bits / {len(coded_bin)} bits = {len(genome*8)/len(coded_bin):.2f}.")
+
+
+
+
 """ Q10. Encode the genome using the LZ77 algorithm. Give the total
 length of the encoded genome and the compression rate."""
 
 # The following code is to avoid recompressing the genome
 # each time we run the program.
 
+def lz77_cached_compression(sliding_window_size, genome):
+    cache_name=f"LZ77Cache{sliding_window_size}.dat"
+    if not os.path.exists(cache_name):
+        print(f"Crunching with LZ77, sliding window {sliding_window_size}")
+        tuples = LZ77_encoder(genome, sliding_window_size)
+        assert "".join(LZ77_decoder(tuples)) == genome, "LZ77 compression went wrong"
+        with open(cache_name,"wb") as fout:
+            pickle.dump(tuples, fout)
+    else:
+        with open(cache_name,"rb") as fin:
+            tuples = pickle.load(fin)
+
+    return tuples
+
 WIN_SIZE = 512*2
-CACHE_NAME=f"LZ77Cache{WIN_SIZE}.dat"
-if not os.path.exists(CACHE_NAME):
-    print("Crunching with LZ77")
-    tuples = LZ77_encoder(genome, WIN_SIZE)
-    with open(CACHE_NAME,"wb") as fout:
-        pickle.dump(tuples, fout)
-else:
-    with open(CACHE_NAME,"rb") as fin:
-        tuples = pickle.load(fin)
+tuples = lz77_cached_compression(WIN_SIZE, genome)
 
-
-print("Test : Decrunching with LZ77")
-res = LZ77_decoder(tuples)
-print(f"Length decompressed={len(res)} chars, expected={len(genome)} chars")
-assert "".join(res) == genome, "LZ77 compression went wrong"
+dl_bits = math.ceil(math.log2(WIN_SIZE))
+char_bits = 8
+tuple_bits = char_bits+dl_bits
+print()
+print(f"Q10: total length of source genome, without spaces : {len(genome)} symbols, {len(genome)*8} bits")
+print(f"Q10: sliding window size = {WIN_SIZE} => {dl_bits} bits for d and l each")
+print(f"Q10: {char_bits} bits per char => {tuple_bits} bits per tuples")
+compressed_size = len(tuples)*tuple_bits
+print(f"Q10: total length of encoded genome : {len(tuples)} tuples * {tuple_bits} bits = {compressed_size} bits")
+print(f"Q10: compression rate : {len(genome)*8} bits / {compressed_size} bits = {len(genome)*8/compressed_size:.2f} ")
 
 
 """Q12. Encode the genome using the best (according to your answer in
@@ -459,9 +584,6 @@ the previous question) combination of LZ77 and Huffman
 algorithms. Give the total length of the encoded genome and the
 compression rate."""
 
-# 10 bits for distance, idem for length, 2 bits per letter.
-compressed_size = len(tuples)*(2*math.log2(WIN_SIZE)+math.log2(4))
-print(f"LZ77 only : {len(tuples)} tuples -> {compressed_size} bits => {compressed_size / len(genome):.1f} bits per symbol")
 
 small_c = [c for d,l,c in tuples]
 small_l = [l for d,l,c in tuples]
@@ -538,23 +660,42 @@ plt.show()
 
 # Compression ************************************************
 
-bits = bitarray()
-bits.extend(compress_counts(dist_count))
-bits.extend(compress_counts(len_count))
-bits.extend(compress_counts(char_count))
+def lz_with_huffman_encode(sliding_window_size, genome):
 
-for d,l,c in tuples:
-    # Compress a tuple (d,l,c) into its huffman representation
-    # (d -> 0101..., l -> 11000, c->101010), using a different
-    # codebook for d,l and c.
-    bits.extend(bitarray(dist_code_map[d]))
-    bits.extend(bitarray(len_code_map[l]))
-    bits.extend(bitarray(char_code_map[c]))
+    tuples = lz77_cached_compression(sliding_window_size, genome)
 
-print(f"LZ77+Huffman compression : {len(bits)} bits => {len(bits)//8} bytes. {len(bits)/(len(genome*8)):.2f} on disk compression rate")
+    dist_count = Counter([d for d,l,c in tuples])
+    len_count = Counter([l for d,l,c in tuples])
+    char_count = Counter([c for d,l,c in tuples])
 
-rate = (len(genome)/len(bits)) * (math.log2(4)/math.log2(2))
-print(f"Compression rate : ({len(genome)} chars /{len(bits)} bits) * ({math.log2(4)} letters / {math.log2(2)} bits) = {rate:.2f}")
+    bits = bitarray()
+    print("Counts for distances")
+    bits.extend(compress_counts(dist_count))
+    print("Counts for lengths")
+    bits.extend(compress_counts(len_count))
+    print("Counts for chars")
+    bits.extend(compress_counts(char_count))
+
+    for d,l,c in tuples:
+        # Compress a tuple (d,l,c) into its huffman representation
+        # (d -> 0101..., l -> 11000, c->101010), using a different
+        # codebook for d,l and c.
+        bits.extend(bitarray(dist_code_map[d]))
+        bits.extend(bitarray(len_code_map[l]))
+        bits.extend(bitarray(char_code_map[c]))
+
+    return bits
+
+bits = lz_with_huffman_encode(WIN_SIZE, genome)
+print()
+print(f"Q12: total length of source genome, without spaces : {len(genome)} symbols, {len(genome)*8} bits on disk")
+print(f"Q12: LZ77+Huffman coded file length : {len(bits)} bits")
+
+# rate = (len(genome)/len(bits)) * (math.log2(4)/math.log2(2))
+# print(f"Q12: Compression rate : ({len(genome)} chars /{len(bits)} bits) * ({math.log2(4)} letters / {math.log2(2)} bits) = {rate:.2f}")
+
+rate = len(genome)*8 / len(bits)
+print(f"Q12: Compression rate : {len(genome)*8} bits / {len(bits)} bits = {rate:.2f}")
 
 # Decompression ************************************************
 
@@ -607,105 +748,20 @@ print(f"LZ77 out : {len(res)} chars; expected {len(genome)} chars")
 assert "".join(res) == genome
 
 
+""" Q13. Report the total lengths and compression rates using (a) LZ77
+and (b) the combination of LZ77 and Huffman, to encode the genome for
+different values of the sliding window size l. Compare your result
+with the total length and compression rate obtained using the on-line
+Lempel-Ziv algorithm.  Discuss your results. """
+
+for sliding_window_size in [256, 512, 1024, 2048, 4096]:
+    chrono = datetime.now()
+    tuples = lz_with_huffman_encode(sliding_window_size, genome)
+    print(f"{sliding_window_size} : time={datetime.now() - chrono}")
+
 exit()
 
 
-""" Q9. Encode the genome using the on-line Lempel-Ziv algorithm. Give
-the total length of the encoded genome and the compression rate."""
-
-# Online LZ algorithm
-
-coded_message = []
-coded_bin = ""
-
-prefix = ""
-prefixes = {"": 0}
-
-EOF_MARK = ''
-
-with open(INPUT_FILE, 'r') as genome:
-
-    # The whole point of this trickery is to detect
-    # EOF one char ahead. This way we can tell when
-    # we're processing the last character of the
-    # input file
-
-    c = genome.read(1)  # Read one byte
-    assert c != EOF_MARK, "Compressing empty file is not supported"
-    next_char = genome.read(1)
-    eof = next_char == EOF_MARK
-
-    while True:
-        if not eof and prefix + c in prefixes:
-            prefix = prefix + c
-        else:
-            # Either EOF on next char,
-            # either prefix+c not in prefixes.
-
-            # In both case we store the prefix+c. That's
-            # especially useful when EOF is met since it
-            # allows us to termiante the output stream cleanly.
-
-            # Number of bits necessary to represent the length
-            # of the prefixes table.
-            # FIXME this is not really fast.
-            l = math.ceil(math.log2(len(prefixes)))
-            if l == 0:
-                l = 1
-
-            # Append (prefix's number, c) to the output stream .
-            coded_bin += f"{np.binary_repr(prefixes[prefix],l)}{ord(c):08b}"
-
-            # Record the new prefix and give it a number
-            prefixes[prefix + c] = len(prefixes)
-            prefix = ""
-
-        if next_char != EOF_MARK:
-            c = next_char
-            next_char = genome.read(1)
-            eof = next_char == EOF_MARK
-        else:
-            break
-
-print(os.path.getsize(INPUT_FILE))
-
-# Test : from 0/1 string to np array
-as_bin = np.frombuffer(np.array(map(int, coded_bin)), np.uint8)
-print(as_bin)
-print(np.unpackbits(as_bin)[0:len(coded_bin)])
-
-print(len(coded_bin) // 8)
-# print(coded_bin)
-
-ndx = 0
-decoded = ""
-prefixes = {0: ""}
-while ndx < len(coded_bin):
-    l = math.ceil(math.log2(len(prefixes)))
-    if l == 0:
-        l = 1
-    prefix_code = int(coded_bin[ndx:ndx+l], 2)
-
-    #print(f"ndx:{ndx}, l:{l}, len pfx:{len(prefixes)}, pfx code:{prefix_code}")
-    c = chr(int(coded_bin[ndx+l:ndx+l+8], 2))
-    # c = coded_bin[ndx+l:ndx+l+1]
-
-    decoded += prefixes[prefix_code] + c
-    # print(l,prefix_code,c,decoded)
-
-    prefixes[len(prefixes)] = prefixes[prefix_code] + c
-    ndx = ndx+l+8
-
-# decoded = ""
-# prefixes = {0: ""}
-# for prefix_code, c in coded_message:
-#     prefixes[len(prefixes)] = prefixes[prefix_code] + c
-#     decoded += prefixes[prefix_code] + c
-
-# print(decoded)
-
-with open(INPUT_FILE, 'r') as genome:
-    assert decoded == genome.read()
 
 
 """
