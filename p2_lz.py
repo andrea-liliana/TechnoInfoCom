@@ -1,4 +1,5 @@
 import os
+import sys
 import math
 import heapq
 from io import StringIO
@@ -26,9 +27,9 @@ def entropy(a):
         h += p*math.log2(p)
     return - h
 
-#ABABAC -> A,B,C ou AB AC
-print(entropy([3,2,1]) / math.log2(3))
-print(entropy([2,1]) / math.log2(2))
+# #ABABAC -> A,B,C ou AB AC
+# print(entropy([3,2,1]) / math.log2(3))
+# print(entropy([2,1]) / math.log2(2))
 
 
 
@@ -108,16 +109,17 @@ def draw_neato_tree(fout, node):
     else:
         fout.write(f"{gid(node)} [label=\"{node.symbol}\\n{node.code}\"]\n")
 
-""" Q1 Implement a function that returns a binary Huffman code for a given probability distribution. Give
-the main steps of your implementation. Explain how to extend your function to generate a Huffman
-code of any alphabet size. Verify your code on Exercise 7 of the second list of exercises, and report
-the output of your code for this example. """
+""" Q1 Implement a function that returns a binary Huffman code for a
+given probability distribution. Give the main steps of your
+implementation. Explain how to extend your function to generate a
+Huffman code of any alphabet size. Verify your code on Exercise 7 of
+the second list of exercises, and report the output of your code for
+this example. """
 
 ex7_freq = [0.05, 0.10, 0.15, 0.15, 0.2, 0.35]
 symbols = [f"{x:.2f}" for x in ex7_freq]
 top_node = build_huffman_tree(dict(zip(symbols, ex7_freq)))
 leaves = compute_leaves_codes(top_node)
-
 
 with open("graph.dot", "w") as fout:
     fout.write("graph HuffmanTree {\n")
@@ -129,7 +131,7 @@ with open("graph.dot", "w") as fout:
 
 
 def bits_to_represent(nb_values):
-    # Disontinuous ! f == 0 in x==1 !
+    # Discontinuous ! f == 0 in x==1 !
     assert nb_values >= 1
     return math.ceil(math.log2(nb_values))
 
@@ -139,23 +141,23 @@ def code_binary_char(c):
 def code_ascii_char(c):
     return f"{ord(c):08b}"
 
-def online_lz_compress(data, code_char):
-    coded_bin = StringIO()
-
-    prefix = ""
-    prefixes = {"": 0}
-
-    EOF_MARK = ''
+def online_lz_compress(data, code_char, tuples_out=False):
 
     # The whole point of this trickery is to detect
     # EOF one char ahead. This way we can tell when
     # we're processing the last character of the
     # input file
 
+    EOF_MARK = ''
     c = data.read(1)  # Read one byte
     assert c != EOF_MARK, "Compressing empty file is not supported"
     next_char = data.read(1)
     eof = next_char == EOF_MARK
+
+    coded_bin = StringIO()
+    prefixes = {"": 0}
+    prefix = ""
+    tuples = ""
 
     while True:
         if not eof and prefix + c in prefixes:
@@ -183,6 +185,13 @@ def online_lz_compress(data, code_char):
                 pfx = f"{np.binary_repr(prefixes[prefix],l)}"
             coded_bin.write(f"{pfx}{char}")
 
+            if tuples_out:
+                if l == 0:
+                    pfx = ""
+                else:
+                    pfx = f"{np.binary_repr(prefixes[prefix],l)}"
+                tuples += f"({pfx},{char}) "
+
             # Record the new prefix and give it a number
             prefixes[prefix + c] = len(prefixes)
 
@@ -196,7 +205,11 @@ def online_lz_compress(data, code_char):
         else:
             break
 
-    return coded_bin.getvalue()
+    if not tuples_out:
+        return coded_bin.getvalue()
+    else:
+        return tuples, coded_bin.getvalue()
+
 
 def decode_binary_char(data, ndx):
     return data[ndx], 1
@@ -304,15 +317,22 @@ algorithm (see State of the art in data compression, slide
 50/53). Reproduce and report the example given in the course."""
 
 slide_50 = "1 0 11 01 010 00 10".replace(" ", "")
-compressed = online_lz_compress(StringIO(slide_50), code_binary_char)
+tuples, compressed = online_lz_compress(StringIO(slide_50), code_binary_char, tuples_out=True)
 assert compressed == "1 00 011 101 1000 0100 0010".replace(" ", "")
 assert online_lz_decompress(compressed, decode_binary_char) == slide_50
+print()
+print(f"Q2: (addr, bit) : {tuples}")
+print(f"Q2: U: {compressed}")
 
-# with open(INPUT_FILE, 'r') as genome:
-#     compressed = online_lz_compress(genome, code_ascii_char)
+""" Q4. Implement a function that returns the encoded sequence using the
+LZ77 algorithm as described by Algorithm 1 given an input string
+and a sliding window size l. Reproduce the example given in Figure
+2 with l = 7."""
 
-# with open(INPUT_FILE, 'r') as genome:
-#     assert online_lz_decompress(compressed, decode_ascii_char) == genome.read()
+S_FIGURE_2 = "abracadabrad"
+print()
+print(f"Q4: Original string : {S_FIGURE_2}")
+print(f"Q4: encoded string : {LZ77_encoder(S_FIGURE_2, 7)}")
 
 
 def build_codebooks(top_node):
@@ -416,7 +436,7 @@ assert GENOME_TEXT == "".join(decode(
     compressed, decode_map)), "Decompressed data is not the same as compressed data"
 
 ratio = (len(GENOME_TEXT)*8) / len(compressed)
-print(f"Q5: Genome size = {len(GENOME_TEXT)*8} bits; Compressed size = {len(compressed)} bits; ratio={ratio:.2f}")
+print(f"Q5: Genome size = {len(GENOME_TEXT)*8} bits; Compressed size = {len(compressed)} bits; ratio={ratio:.2f}")
 
 
 """ Q6. Give the expected average length for your Huffman
@@ -436,79 +456,79 @@ prob = np.array(prob)
 print(prob)
 prob = prob.astype(float)
 
-#Calculate the lengths
-l = []
-for value in code_map.values():
-  l.append(len(value))
-l = np.array(l)
+# Calculate the lengths of the Huffman codes
+# l = []
+# for value in code_map.values():
+#   l.append(len(value))
+# l = np.array(l)
 
-emp = prob*l
-final = np.sum(emp)
+l = np.array([len(value) for value in code_map.values()])
+
+expected_average_length = np.sum(prob*l)
+print()
+print(f"Q6: expected_average_length : {expected_average_length:.2f} bits")
+
+
+print(f"Q6: empirical average length : {len(compressed)} bits / {len(GENOME_TEXT)} symbols = {len(compressed)/(len(GENOME_TEXT)//CODON_LEN):.2f}")
 
 # Calculate the entropy for the bounds
-entropy = - np.sum(prob*np.log(prob))
+entropy = - np.sum(prob*np.log2(prob))
 
-""" For Q7 of Project2, I have two questions.
+print(f"Q6: entropy of source alphabet is : {entropy:.2f}")
 
-1: Must we reuse the same Huffman codes (those of Q5) for each input
-genome length or should we recompute the Huffman codes for each of the
-input genome length ? I ask because I don't see the point in reusing
-the same Huffman code all the time.
-
-2: You ask to plot the empirical average length of the encoded genome.
-Do you confirm that there's an average to compute ? Indeed, when I
-encode the genome, there's only one possible encoding with one length,
-so I don't see on what I must compute an average.
-"""
 
 """ Q7. Plot the evolution of the empirical average length of the
 encoded genome using your Huffman code for increasing input genome
 lengths. Discuss your result.  """
 
+if not ("skip7" in sys.argv):
+    # Make sure the step is a multiple of codon length
+    STEP = ((len(GENOME_TEXT)//100) // CODON_LEN) * CODON_LEN
 
-# Make sure the step is a multiple of codon length
-STEP = ((len(GENOME_TEXT)//100) // CODON_LEN) * CODON_LEN
+    # We'll do two graphs. One with fixed Huffman code and
+    # one with recomputed Huffman codes. This prepares
+    # for the first one.
 
-const_huff_code_map, _ = build_codebooks(
-    build_huffman_tree(
-        Counter(
-            codons_iterator(GENOME_TEXT))))
+    const_huff_code_map, _ = build_codebooks(
+        build_huffman_tree(
+            Counter(
+                codons_iterator(GENOME_TEXT))))
 
-x_axis = []
-empirical_avg_lens = []
-empirical_avg_lens_const_huffman = []
+    x_axis = []
+    empirical_avg_lens = []
+    empirical_avg_lens_const_huffman = []
 
-for i in range(STEP, len(GENOME_TEXT), STEP):
-    g = GENOME_TEXT[0:i]
-    codons_in_subgenome = len(g) // CODON_LEN
-    x_axis.append(round(100*len(g) / len(GENOME_TEXT)))
+    for i in range(STEP, len(GENOME_TEXT), STEP):
+        g = GENOME_TEXT[0:i]
+        codons_in_subgenome = len(g) // CODON_LEN
+        x_axis.append(round(100*len(g) / len(GENOME_TEXT)))
 
-    # First graph : one Huffman per sub-genome
+        # First graph : one Huffman per sub-genome
 
-    codons_cnt = Counter(codons_iterator(g))
-    top_node = build_huffman_tree(codons_cnt)
-    code_map, decode_map = build_codebooks(top_node)
-    compressed_bits = encode(codons_iterator(g), code_map)
-    assert g == "".join(decode(compressed_bits, decode_map)), "Compression went wrong"
+        codons_cnt = Counter(codons_iterator(g))
+        top_node = build_huffman_tree(codons_cnt)
+        code_map, decode_map = build_codebooks(top_node)
+        compressed_bits = encode(codons_iterator(g), code_map)
+        assert g == "".join(decode(compressed_bits, decode_map)), "Compression went wrong"
 
-    empirical_avg_lens.append(len(compressed_bits) / codons_in_subgenome)
+        empirical_avg_lens.append(len(compressed_bits) / codons_in_subgenome)
 
-    # Second graph : one Huffman for all sub-genomes
+        # Second graph : one Huffman for all sub-genomes
 
-    compressed_bits = encode(codons_iterator(g), const_huff_code_map)
-    empirical_avg_lens_const_huffman.append(len(compressed_bits) / codons_in_subgenome)
+        compressed_bits = encode(codons_iterator(g), const_huff_code_map)
+        empirical_avg_lens_const_huffman.append(len(compressed_bits) / codons_in_subgenome)
 
-    print(f"{x_axis[-1]} {empirical_avg_lens[-1]:.3f} {empirical_avg_lens_const_huffman[-1]:.3f}")
+        print(f"{x_axis[-1]} {empirical_avg_lens[-1]:.3f} {empirical_avg_lens_const_huffman[-1]:.3f}")
 
-plt.figure()
-plt.plot(x_axis, empirical_avg_lens, label="One Huffman per subgenome")
-plt.plot(x_axis, empirical_avg_lens_const_huffman, label="One Huffman for all")
-plt.title("Empirical average length")
-plt.xlabel("Data size (% of the total genome size)")
-plt.ylabel("Bits per codon")
-plt.legend()
-plt.savefig("q7.pdf")
-plt.show()
+    plt.figure()
+    plt.plot(x_axis, empirical_avg_lens, label="One Huffman per subgenome")
+    plt.plot(x_axis, empirical_avg_lens_const_huffman, label="One Huffman for all")
+    plt.title("Empirical average length")
+    plt.xlabel("Data size (% of the total genome size)")
+    plt.ylabel("Bits per codon")
+    plt.legend()
+    plt.savefig("q7.pdf")
+    plt.show()
 
 
 
@@ -528,8 +548,6 @@ print(f"Q9: compression rate (lecture 4, slide 18) : {len(GENOME_TEXT*8)} bits /
 
 
 
-""" Q10. Encode the genome using the LZ77 algorithm. Give the total
-length of the encoded genome and the compression rate."""
 
 # The following code is to avoid recompressing the genome
 # each time we run the program.
@@ -559,12 +577,15 @@ def compute_compression_rate_for_LZ77(tuples, sliding_window_size, genome):
     return compressed_size, compression_rate
 
 
+""" Q10. Encode the genome using the LZ77 algorithm. Give the total
+length of the encoded genome and the compression rate."""
+
 WIN_SIZE = 512*2
 tuples = lz77_cached_compression(WIN_SIZE, GENOME_TEXT)
 
 dl_bits = math.ceil(math.log2(WIN_SIZE))
 char_bits = 8
-tuple_bits = char_bits+dl_bits
+tuple_bits = char_bits+2*dl_bits
 print()
 print(f"Q10: total length of source genome, without spaces : {len(GENOME_TEXT)} symbols, {len(GENOME_TEXT)*8} bits")
 print(f"Q10: sliding window size = {WIN_SIZE} => {dl_bits} bits for d and l each")
@@ -572,6 +593,7 @@ print(f"Q10: {char_bits} bits per char => {tuple_bits} bits per tuples")
 compressed_size, compression_rate = compute_compression_rate_for_LZ77(tuples, WIN_SIZE, GENOME_TEXT)
 print(f"Q10: total length of encoded genome : {len(tuples)} tuples * {tuple_bits} bits = {compressed_size} bits")
 print(f"Q10: compression rate : {len(GENOME_TEXT)*8} bits / {compressed_size} bits = {len(GENOME_TEXT)*8/compressed_size:.2f} ")
+
 
 
 """Q12. Encode the genome using the best (according to your answer in
@@ -757,7 +779,7 @@ different values of the sliding window size l. Compare your result
 with the total length and compression rate obtained using the on-line
 Lempel-Ziv algorithm.  Discuss your results. """
 
-for sliding_window_size in [256, 512, 1024, 2048, 4096]:
+for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384, 32768]:
     # LZ77 only
     tuples = lz77_cached_compression(sliding_window_size, GENOME_TEXT)
     compressed_size, compression_rate = compute_compression_rate_for_LZ77(tuples, sliding_window_size, GENOME_TEXT)
