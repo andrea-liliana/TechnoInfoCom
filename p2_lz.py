@@ -421,8 +421,30 @@ if True:
 code. Compare this value with (a) the empirical average length, and
 (b) theoretical bound(s). Justify.  """
 
+# Calculate probabilities
+f = 319519
+for key, value in codons_cnt.items():
+    codons_cnt[key] = value/f
 
+prob = []
+for value in codons_cnt.values():
+  prob.append(value)
 
+prob = np.array(prob)
+print(prob)
+prob = prob.astype(np.float)
+
+#Calculate the lengths
+l = []
+for value in code_map.values():
+  l.append(len(value))
+l = np.array(l)
+
+emp = prob*l
+final = np.sum(emp)
+
+# Calculate the entropy for the bounds 
+entropy = - np.sum(prob*np.log(prob))
 
 """ For Q7 of Project2, I have two questions.
 
