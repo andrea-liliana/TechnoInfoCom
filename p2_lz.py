@@ -465,28 +465,48 @@ so I don't see on what I must compute an average.
 encoded genome using your Huffman code for increasing input genome
 lengths. Discuss your result.  """
 
-STEP = ((len(genome)//20) // CODON_LEN) * CODON_LEN
+
+# Make sure the step is a multiple of codon length
+STEP = ((len(genome)//100) // CODON_LEN) * CODON_LEN
+
+const_huff_code_map, _ = build_codebooks(
+    build_huffman_tree(
+        Counter(
+            codons_iterator(genome))))
 
 x_axis = []
 empirical_avg_lens = []
+empirical_avg_lens_const_huffman = []
+
 for i in range(STEP, len(genome), STEP):
     g = genome[0:i]
+    codons_in_subgenome = len(g) // CODON_LEN
+    x_axis.append(round(100*len(g) / len(genome)))
+
+    # First graph : one Huffman per sub-genome
+
     codons_cnt = Counter(codons_iterator(g))
     top_node = build_huffman_tree(codons_cnt)
     code_map, decode_map = build_codebooks(top_node)
-
     compressed_bits = encode(codons_iterator(g), code_map)
     assert g == "".join(decode(compressed_bits, decode_map)), "Compression went wrong"
 
-    empirical_avg_lens.append(len(compressed_bits) / (len(g) // CODON_LEN))
-    x_axis.append(round(100*len(g) / len(genome)))
-    print(f"{x_axis[-1]} {empirical_avg_lens[-1]:.3f}")
+    empirical_avg_lens.append(len(compressed_bits) / codons_in_subgenome)
+
+    # Second graph : one Huffman for all sub-genomes
+
+    compressed_bits = encode(codons_iterator(g), const_huff_code_map)
+    empirical_avg_lens_const_huffman.append(len(compressed_bits) / codons_in_subgenome)
+
+    print(f"{x_axis[-1]} {empirical_avg_lens[-1]:.3f} {empirical_avg_lens_const_huffman[-1]:.3f}")
 
 plt.figure()
-plt.plot(x_axis, empirical_avg_lens)
+plt.plot(x_axis, empirical_avg_lens, label="One Huffman per subgenome")
+plt.plot(x_axis, empirical_avg_lens_const_huffman, label="One Huffman for all")
 plt.title("Empirical average length")
 plt.xlabel("Data size (% of the total genome size)")
 plt.ylabel("Bits per codon")
+plt.legend()
 plt.savefig("q7.pdf")
 plt.show()
 
