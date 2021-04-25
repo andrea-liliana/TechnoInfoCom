@@ -676,6 +676,14 @@ def lz_with_huffman_encode(sliding_window_size, genome):
     print("Counts for chars")
     bits.extend(compress_counts(char_count))
 
+    # Building Huffman trees and codebooks
+    top_node = build_huffman_tree(dist_count)
+    dist_code_map, _ = build_codebooks(top_node)
+    top_node = build_huffman_tree(len_count)
+    len_code_map, _ = build_codebooks(top_node)
+    top_node = build_huffman_tree(char_count)
+    char_code_map, _ = build_codebooks(top_node)
+
     for d,l,c in tuples:
         # Compress a tuple (d,l,c) into its huffman representation
         # (d -> 0101..., l -> 11000, c->101010), using a different
