@@ -446,7 +446,7 @@ emp = prob*l
 final = np.sum(emp)
 
 # Calculate the entropy for the bounds
-entropy = - np.sum(prob*np.log(prob))
+entropy = - np.sum(prob*np.log2(prob))
 
 """ For Q7 of Project2, I have two questions.
 
@@ -489,6 +489,8 @@ plt.xlabel("Data size (% of the total genome size)")
 plt.ylabel("Bits per codon")
 plt.savefig("q7.pdf")
 plt.show()
+
+print("q7", empirical_avg_lens)
 
 
 
