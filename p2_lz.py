@@ -7,9 +7,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from bitarray import bitarray
 
-from p2_LZ77 import LZ77_encoder, LZ77_decoder, compute_compression_rate_for_LZ77, lz77_cached_compression
+from p2_LZ77 import LZ77_encoder, LZ77_decoder, compute_compression_rate_for_LZ77,\
+    lz77_cached_compression
 from p2_online_lz import *
 from p2_huffman import *
+from p2_utils import *
 
 INPUT_FILE = "genome.txt"
 CODON_LEN = 3
@@ -27,10 +29,6 @@ def entropy(a):
 # #ABABAC -> A,B,C ou AB AC
 # print(entropy([3,2,1]) / math.log2(3))
 # print(entropy([2,1]) / math.log2(2))
-
-
-
-
 
 def gid(node):
     return f"{int(id(node))}"
@@ -67,83 +65,6 @@ with open("graph.dot", "w") as fout:
     fout.write("}\n")
 
 
-
-def bits_to_represent(nb_values):
-    # Discontinuous ! f == 0 in x==1 !
-    assert nb_values >= 1
-    return math.ceil(math.log2(nb_values))
-
-def int32_to_bits(i):
-    # We take 32 bits to be safe.
-    return bitarray(f"{i:032b}")
-
-def compress_values(values):
-    if type(values[0]) == int:
-        bits_per_value = bits_to_represent(max(values)+1) # +1 is tricky ! We assume we encode values 0 to max ! FIXME !
-        fmt = lambda x: f"{x:0{bits_per_value}b}"
-    elif type(values[0]) == str and len(values[0]) == 1:
-        bits_per_value = 8
-        fmt = lambda x: f"{ord(x):0{bits_per_value}b}"
-    else:
-        raise Exception("Only int's and one-char-strings are supported")
-
-    # print(f"Compress: bits_per_value={bits_per_value}, nb_values={len(values)} [{min(values)}, {max(values)}]")
-
-    bits = bitarray()
-    bits.extend(int32_to_bits(bits_per_value))
-    bits.extend(int32_to_bits(len(values)))
-
-    for v in values:
-        bits.extend(bitarray(fmt(v)))
-    return bits
-
-def decompress_values(bits, as_type='int'):
-    bits_per_value = int(bits[0:32].to01(), 2)
-    nb_values = int(bits[32:64].to01(), 2)
-
-    cut_bits = [bits[i:i+bits_per_value].to01() for i in range(64,64+nb_values*bits_per_value, bits_per_value)]
-
-    if as_type == 'int':
-        v = [int(x, 2) for x in cut_bits]
-    elif as_type == "char":
-        v = [chr(int(x, 2)) for x in cut_bits]
-    else:
-        raise Exception("Only int's and one-char-strings are supported")
-
-    # print(f"Decompress: bits_per_value={bits_per_value}, nb_values={nb_values}")
-    # Return bits read, decompressed counts dictionary
-    return 64 + bits_per_value*nb_values, v
-
-def compress_counts(counts):
-    # for v in counts.keys():
-    #     assert v > 0, "0 is reserved for end of stream symbol"
-
-    bits = bitarray()
-    bits.extend(compress_values(list(counts.keys())))
-    bits.extend(compress_values(list(counts.values())))
-    return bits
-
-def decompress_counts(bits, as_type='int'):
-    total_read_bits = 0
-    read_bits, k = decompress_values(bits[total_read_bits:], as_type)
-    total_read_bits += read_bits
-    read_bits, v = decompress_values(bits[total_read_bits:])
-    total_read_bits += read_bits
-
-    # Return bits read, decompressed counts dictionary
-    return total_read_bits, dict(zip(k,v))
-
-# Test compress values
-bits = compress_values([1,2,3,4,5,6,7,8,9,10,100,101,102,103,256])
-decomp_bits, values = decompress_values(bits)
-assert decomp_bits == len(bits)
-
-# Test compress counts
-bits = compress_counts({1:2, 10:11, 12:256})
-decomp_bits, cmap = decompress_counts(bits)
-assert decomp_bits == len(bits), f"{decomp_bits} != {len(bits)}"
-
-
 """ Q2. Given a sequence of symbols, implement a function that returns
 a dictionary and the encoded sequence using the on-line Lempel-Ziv
 algorithm (see State of the art in data compression, slide
@@ -168,71 +89,6 @@ print(f"Q4: Original string : {S_FIGURE_2}")
 print(f"Q4: encoded string : {LZ77_encoder(S_FIGURE_2, 7)}")
 
 
-
-
-def codons_iterator(genome):
-    for i in range(0, len(genome), CODON_LEN):
-        yield genome[i:i+CODON_LEN]
-
-
-def encode(symbol_iter, code_map):
-    """ Convert a serie of symbols into a serie of
-    corresponding codewords (expected to be string
-    representation of binary codes, eg 001100).
-
-    - symbol_iter : an iterator which will give all
-    the symbols of the data to compress, on by one,
-    in order.
-    - code_map : map from symbol to codeword.
-
-    Note that data end detection rely on the iterator end
-    (here it's detected by Python). So we don't add an
-    additionaly symbol to represent the end of file.
-    """
-
-    file_str = StringIO()
-    for symbol in symbol_iter:
-        file_str.write(code_map[symbol])
-
-    return file_str.getvalue()
-
-
-def decode_one_symbol(compressed, decode_map):
-    prefix = ""
-    for c in compressed:
-        assert c in (True, False), f"Unexpected char : {c}"
-        if c:
-            prefix += "1"
-        else:
-            prefix += "0"
-
-        if prefix in decode_map:
-            return len(prefix), decode_map[prefix]
-
-    raise Exception("EOF unexpected")
-
-def decode(compressed, decode_map, nb_symbols = 2**31):
-    # File end is detected by file size. See remark in
-    # encode() funtcion.
-
-    ns = 0
-    prefix = ""
-    file_str = StringIO()
-    for c in compressed:
-        prefix += c
-
-        if prefix in decode_map:
-            file_str.write(decode_map[prefix])
-            prefix = ""
-
-            if ns < nb_symbols-1:
-                ns += 1
-            else:
-                break
-
-    return file_str.getvalue()
-
-
 """ Q5.
 
 A/ Estimate the marginal probability distribution of all codons from
@@ -241,6 +97,10 @@ the given genome,
 B/ and determine the corresponding binary Huffman code and the encoded
 genome.  Give the total length of the encoded genome and the
 compression rate. """
+
+def codons_iterator(genome):
+    for i in range(0, len(genome), CODON_LEN):
+        yield genome[i:i+CODON_LEN]
 
 codons_cnt = Counter(codons_iterator(GENOME_TEXT))
 CODONS = sorted(codons_cnt.keys())
@@ -294,16 +154,12 @@ with open('Huffman_result.txt', 'w') as f:
             print(k,"&", codons_cnt[k],"&", code_map[k] ,"\\")
 
 print(f"Q6: expected_average_length : {expected_average_length:.2f} bits")
-
-
 print(f"Q6: empirical average length : {len(compressed)} bits / {len(GENOME_TEXT)} symbols = {len(compressed)/(len(GENOME_TEXT)//CODON_LEN):.2f}")
 
 # Calculate the entropy for the bounds
 entropy = - np.sum(prob*np.log2(prob))
-
 print(f"Q6: entropy of source alphabet is : {entropy:.2f}")
 
-exit()
 
 """ Q7. Plot the evolution of the empirical average length of the
 encoded genome using your Huffman code for increasing input genome
@@ -358,8 +214,7 @@ if not ("skip7" in sys.argv):
     plt.savefig("q7.pdf")
     plt.show()
 
-print("q7", empirical_avg_lens)
-
+    print("Q7: Empirical Average lengths : ", empirical_avg_lens)
 
 
 """ Q9. Encode the genome using the on-line Lempel-Ziv algorithm. Give
@@ -371,15 +226,12 @@ assert decoded == GENOME_TEXT, "something went wrong in the compression or decom
 
 print()
 print("Q9: encode genome with online LZ")
-print(f"Q9: total length of source genome, without spaces : {len(GENOME_TEXT)} symbols, {len(GENOME_TEXT)*8} bits")
+print("Q9: total length of source genome, without spaces : " +
+      f"{len(GENOME_TEXT)} symbols, {len(GENOME_TEXT)*8} bits")
 print(f"Q9: total length of encoded genome : {len(coded_bin)} bits")
-print(f"Q9: compression rate (lecture 4, slide 18) : {len(GENOME_TEXT*8)} bits / {len(coded_bin)} bits = {len(GENOME_TEXT*8)/len(coded_bin):.2f}.")
-
-
-
-
-
-
+print("Q9: compression rate (lecture 4, slide 18) : " +
+      f"{len(GENOME_TEXT*8)} bits / {len(coded_bin)} bits = " +
+      f"{len(GENOME_TEXT*8)/len(coded_bin):.2f}.")
 
 
 """ Q10. Encode the genome using the LZ77 algorithm. Give the total
@@ -400,12 +252,10 @@ print(f"Q10: total length of encoded genome : {len(tuples)} tuples * {tuple_bits
 print(f"Q10: compression rate : {len(GENOME_TEXT)*8} bits / {compressed_size} bits = {len(GENOME_TEXT)*8/compressed_size:.2f} ")
 
 
-
 """Q12. Encode the genome using the best (according to your answer in
 the previous question) combination of LZ77 and Huffman
 algorithms. Give the total length of the encoded genome and the
 compression rate."""
-
 
 small_c = [c for d,l,c in tuples]
 small_l = [l for d,l,c in tuples]
@@ -432,23 +282,23 @@ compressed_size = sum([len(code_map[t])*cnt for t, cnt in tuples_count.items()])
 # --------------------------------------------------------------------
 # (l,d,c) -> (l,c) + (d)
 
-dist_count = Counter(small_d) # 1 -> 001 ,2->110,3->1110,2,5,1,1,1,1,1,4,6,...,1000 -> dict( symbol -> count)
+dist_count = Counter(small_d)
 len_count = Counter(small_l)
 char_count = Counter(small_c)
 print(char_count)
-#char_count = dict(zip(CODONS, [c[codon] for codon in CODONS]))
+# char_count = dict(zip(CODONS, [c[codon] for codon in CODONS]))
 
 plt.figure()
 plt.plot(list(dist_count.values()))
 plt.xlabel("Distances")
 plt.ylabel("# occurences")
-#plt.show()
+# plt.show()
 
 plt.figure()
 plt.plot(list(len_count.values()))
 plt.xlabel("Lengths")
 plt.ylabel("# occurences")
-#plt.show()
+# plt.show()
 
 top_node = build_huffman_tree(dist_count)
 dist_code_map, dist_decode_map = build_codebooks(top_node)
@@ -486,9 +336,9 @@ def lz_with_huffman_encode(sliding_window_size, genome):
 
     tuples = lz77_cached_compression(sliding_window_size, genome)
 
-    dist_count = Counter([d for d,l,c in tuples])
-    len_count = Counter([l for d,l,c in tuples])
-    char_count = Counter([c for d,l,c in tuples])
+    dist_count = Counter([d for d, l, c in tuples])
+    len_count = Counter([l for d, l, c in tuples])
+    char_count = Counter([c for d, l, c in tuples])
 
     bits = bitarray()
     # print("Counts for distances")
@@ -518,14 +368,13 @@ def lz_with_huffman_encode(sliding_window_size, genome):
 
 bits = lz_with_huffman_encode(WIN_SIZE, GENOME_TEXT)
 print()
-print(f"Q12: total length of source genome, without spaces : {len(GENOME_TEXT)} symbols, {len(GENOME_TEXT)*8} bits on disk")
+print("Q12: total length of source genome, without spaces : " +
+      f"{len(GENOME_TEXT)} symbols, {len(GENOME_TEXT)*8} bits on disk")
 print(f"Q12: LZ77+Huffman coded file length : {len(bits)} bits")
 
-# rate = (len(genome)/len(bits)) * (math.log2(4)/math.log2(2))
-# print(f"Q12: Compression rate : ({len(genome)} chars /{len(bits)} bits) * ({math.log2(4)} letters / {math.log2(2)} bits) = {rate:.2f}")
-
 rate = len(GENOME_TEXT)*8 / len(bits)
-print(f"Q12: Compression rate : {len(GENOME_TEXT)*8} bits / {len(bits)} bits = {rate:.2f}")
+print(f"Q12: Compression rate : {len(GENOME_TEXT)*8} bits / " +
+      f"{len(bits)} bits = {rate:.2f}")
 
 # Decompression ************************************************
 
@@ -537,7 +386,8 @@ total_read_bits += read_bits
 read_bits, char_count = decompress_counts(bits[total_read_bits:], as_type='char')
 total_read_bits += read_bits
 
-assert sum(dist_count.values()) == sum(len_count.values()) == sum(char_count.values()) == len(tuples), "Counts deomcpression went bad"
+assert sum(dist_count.values()) == sum(len_count.values()) == \
+    sum(char_count.values()) == len(tuples), "Counts deomcpression went bad"
 
 top_node = build_huffman_tree(dist_count)
 dist_code_map, dist_decode_map = build_codebooks(top_node)
@@ -560,7 +410,7 @@ for i in range(sum(dist_count.values())):
     total_read_bits += read_bits
     read_bits, c = decode_one_symbol(bits[total_read_bits:total_read_bits+100], char_decode_map)
     total_read_bits += read_bits
-    dtuples.append((d,l,c))
+    dtuples.append((d, l, c))
 
     if len(dtuples) % 10000 == 0:
         print(len(dtuples))
@@ -569,9 +419,8 @@ print(f"Bits read = {total_read_bits}; decompresseed tuples = {len(dtuples)}")
 
 assert len(tuples) == len(dtuples)
 for i in range(len(tuples)):
-    assert dtuples[i][0] == tuples[i][0], f"Decompression failed on tuples {tuples[i]} != {dtuples[i]}"
-    assert dtuples[i][1] == tuples[i][1], f"Decompression failed on tuples {tuples[i]} != {dtuples[i]}"
-    assert dtuples[i][2] == tuples[i][2], f"Decompression failed on tuples {tuples[i]} != {dtuples[i]}"
+    assert dtuples[i] == tuples[i], \
+        f"Decompression failed on tuples {tuples[i]} != {dtuples[i]}"
 
 res = LZ77_decoder(dtuples)
 print(f"LZ77 out : {len(res)} chars; expected {len(GENOME_TEXT)} chars")
@@ -584,16 +433,20 @@ different values of the sliding window size l. Compare your result
 with the total length and compression rate obtained using the on-line
 Lempel-Ziv algorithm.  Discuss your results. """
 
-for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 2**17, 2**18]:
+for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384,
+                            32768, 65536, 2**17, 2**18]:
     # LZ77 only
     tuples = lz77_cached_compression(sliding_window_size, GENOME_TEXT)
-    compressed_size, compression_rate = compute_compression_rate_for_LZ77(tuples, sliding_window_size, GENOME_TEXT)
+    compressed_size, compression_rate = compute_compression_rate_for_LZ77(
+        tuples, sliding_window_size, GENOME_TEXT)
 
     # LZ77 + Huffman
     bits = lz_with_huffman_encode(sliding_window_size, GENOME_TEXT)
     lz77_huffman_rate = len(GENOME_TEXT)*8 / len(bits)
 
-    print(f"{sliding_window_size} & {compressed_size} & {compression_rate:.2f} & {len(bits)} & {lz77_huffman_rate:.2f} \\\\")
+    print(f"{sliding_window_size} & {compressed_size} & " +
+          f"{compression_rate:.2f} & {len(bits)} & " +
+          f"{lz77_huffman_rate:.2f} \\\\")
 
 exit()
 

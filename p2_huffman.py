@@ -76,3 +76,61 @@ def build_codebooks(top_node):
         decode_map[node.code] = node.symbol
 
     return code_map, decode_map
+
+
+def encode(symbol_iter, code_map):
+    """ Convert a serie of symbols into a serie of
+    corresponding codewords (expected to be string
+    representation of binary codes, eg 001100).
+
+    - symbol_iter : an iterator which will give all
+    the symbols of the data to compress, on by one,
+    in order.
+    - code_map : map from symbol to codeword.
+
+    Note that data end detection rely on the iterator end
+    (here it's detected by Python). So we don't add an
+    additionaly symbol to represent the end of file.
+    """
+
+    file_str = StringIO()
+    for symbol in symbol_iter:
+        file_str.write(code_map[symbol])
+
+    return file_str.getvalue()
+
+
+def decode_one_symbol(compressed, decode_map):
+    prefix = ""
+    for c in compressed:
+        assert c in (True, False), f"Unexpected char : {c}"
+        if c:
+            prefix += "1"
+        else:
+            prefix += "0"
+
+        if prefix in decode_map:
+            return len(prefix), decode_map[prefix]
+
+    raise Exception("EOF unexpected")
+
+def decode(compressed, decode_map, nb_symbols = 2**31):
+    # File end is detected by file size. See remark in
+    # encode() funtcion.
+
+    ns = 0
+    prefix = ""
+    file_str = StringIO()
+    for c in compressed:
+        prefix += c
+
+        if prefix in decode_map:
+            file_str.write(decode_map[prefix])
+            prefix = ""
+
+            if ns < nb_symbols-1:
+                ns += 1
+            else:
+                break
+
+    return file_str.getvalue()
