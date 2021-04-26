@@ -2,6 +2,7 @@ import sys
 import math
 from io import StringIO
 from collections import Counter
+from contextlib import redirect_stdout
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -89,8 +90,8 @@ def codons_iterator(genome):
 codons_cnt = Counter(codons_iterator(GENOME_TEXT))
 CODONS = sorted(codons_cnt.keys())
 
-print(entropy(Counter(GENOME_TEXT).values()))
-print(entropy(codons_cnt.values()))
+
+# B/ Huffman tree
 
 top_node = build_huffman_tree(codons_cnt)
 code_map, decode_map = build_codebooks(top_node)
@@ -103,42 +104,43 @@ ratio = (len(GENOME_TEXT)*8) / len(compressed)
 print(f"Q5: Genome size = {len(GENOME_TEXT)*8} bits; Compressed size = {len(compressed)} bits; ratio={ratio:.2f}")
 
 
+# A/ Marginal probabilities
+
+marginal_probabilities = dict()
+f = sum(codons_cnt.values())
+for key, value in codons_cnt.items():
+    marginal_probabilities[key] = value/f
+
+with open('Huffman_result.inc', 'w') as f:
+    with redirect_stdout(f):
+        all_keys = [p[0] for p in
+                    sorted([(k, cnt)
+                            for k, cnt in marginal_probabilities.items()],
+                           key=lambda p: p[1], reverse=True)]
+        two_columns = zip(all_keys[:len(all_keys)//2],
+                          all_keys[len(all_keys)//2:])
+
+        for c1, c2 in two_columns:
+            print(f"{c1} & {marginal_probabilities[c1]:.4f} & {code_map[c1]} & {c2}" +
+                  f" & {marginal_probabilities[c2]:.4f} & {code_map[c2]}\\\\")
+
+
 """ Q6. Give the expected average length for your Huffman
 code. Compare this value with (a) the empirical average length, and
 (b) theoretical bound(s). Justify.  """
 
-# Calculate probabilities
-f = sum(codons_cnt.values())
-for key, value in codons_cnt.items():
-    codons_cnt[key] = round(value/f, 5)
 
-prob = []
-for value in codons_cnt.values():
-    prob.append(value)
+print(f"Entropy of symbols : {entropy(Counter(GENOME_TEXT).values()):.2f}")
+print(f"Entropy of codons  : {entropy(codons_cnt.values()):.2f}")
 
-prob = np.array(prob)
-#print(prob)
-prob = prob.astype(float)
-
-# Calculate the lengths of the Huffman codes
-# l = []
-# for value in code_map.values():
-#   l.append(len(value))
-# l = np.array(l)
-
-l = np.array([len(value) for value in code_map.values()])
-
-expected_average_length = np.sum(prob*l)
-
-# Get table q5
-from contextlib import redirect_stdout
-with open('Huffman_result.txt', 'w') as f:
-    with redirect_stdout(f):
-        for k in codons_cnt.keys() & code_map.keys():
-            print(k,"&", codons_cnt[k],"&", code_map[k] ,"\\")
+prob = np.array(list(marginal_probabilities.values()), dtype=float)
+huffman_codes_lens = np.array([len(value) for value in code_map.values()])
+expected_average_length = np.sum(prob*huffman_codes_lens)
 
 print(f"Q6: expected_average_length : {expected_average_length:.2f} bits")
 print(f"Q6: empirical average length : {len(compressed)} bits / {len(GENOME_TEXT)} symbols = {len(compressed)/(len(GENOME_TEXT)//CODON_LEN):.2f}")
+
+exit()
 
 # Calculate the entropy for the bounds
 entropy = - np.sum(prob*np.log2(prob))
