@@ -1,3 +1,8 @@
+import math
+import os.path
+import pickle
+from datetime import datetime
+
 def LZ77_encoder(input_text, SWSIZE):
     """ Return a list of (distance, length, character) tuples.
     """
@@ -64,6 +69,35 @@ def LZ77_encoder(input_text, SWSIZE):
     return compressed
 
 
+def compute_compression_rate_for_LZ77(tuples, sliding_window_size, genome):
+    dl_bits = math.ceil(math.log2(sliding_window_size))
+    char_bits = 8
+    tuple_bits = char_bits+2*dl_bits
+    compressed_size_in_bits = len(tuples)*tuple_bits
+    compression_rate = len(genome)*8/compressed_size_in_bits
+    return compressed_size_in_bits, compression_rate
+
+
+# The following code is to avoid recompressing the genome
+# each time we run the program.
+
+def lz77_cached_compression(sliding_window_size, genome):
+    cache_name=f"LZ77Cache{sliding_window_size}.dat"
+    if not os.path.exists(cache_name):
+        print(f"Crunching with LZ77, sliding window {sliding_window_size}")
+        chrono = datetime.now()
+        tuples = LZ77_encoder(genome, sliding_window_size)
+        print(f"Compression took {datetime.now() - chrono}")
+        assert "".join(LZ77_decoder(tuples)) == genome, "LZ77 compression went wrong"
+        with open(cache_name,"wb") as fout:
+            pickle.dump(tuples, fout)
+    else:
+        with open(cache_name,"rb") as fin:
+            tuples = pickle.load(fin)
+
+    return tuples
+
+
 def LZ77_decoder(encoded):
     decoded = []
     for d, l, c in encoded:
@@ -91,17 +125,3 @@ if __name__ == "__main__":
     S = "abracadabrad"
     print(S)
     print(LZ77_encoder(S, 7))
-
-    """ Q10. Encode the genome using the LZ77 algorithm. Give the total
-    length of the encoded genome and the compression rate."""
-
-    import numpy as np
-    genome = np.genfromtxt("genome.txt", dtype='str')
-    genome = "".join(genome)
-
-    print("Compressing full genome")
-    compressed = LZ77_encoder(genome, 1024 // 2)
-    print(f"Compression has {len(compressed)} tuples")
-    print("Decompressing")
-    decompressed = LZ77_decoder(compressed)
-    assert "".join(decompressed) == genome

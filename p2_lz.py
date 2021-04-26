@@ -1,18 +1,15 @@
-import os
 import sys
 import math
-import heapq
 from io import StringIO
 from collections import Counter
-import os.path
-import pickle
-from datetime import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
 from bitarray import bitarray
 
-from p2_LZ77 import LZ77_encoder, LZ77_decoder
+from p2_LZ77 import LZ77_encoder, LZ77_decoder, compute_compression_rate_for_LZ77, lz77_cached_compression
+from p2_online_lz import *
+from p2_huffman import *
 
 INPUT_FILE = "genome.txt"
 CODON_LEN = 3
@@ -34,65 +31,6 @@ def entropy(a):
 
 
 
-class Node:
-    def __init__(self, left_child=None, right_child=None, weight=None, symbol=None):
-        self.left_child = left_child
-        self.right_child = right_child
-
-        if self.has_both_children():
-            assert weight is None and symbol is None
-            self.weight = self.left_child.weight + self.right_child.weight
-            self.symbol = None
-        else:
-            assert weight > 0 and symbol is not None, f"Weight={weight}, symbol={symbol}"
-            self.weight = weight
-            self.symbol = symbol
-
-        assert (left_child is None and right_child is None) or self.has_both_children()
-        self.code = None
-
-    def has_both_children(self):
-        return self.left_child is not None and self.right_child is not None
-
-    def __eq__(self, other):
-        return self.weight == other.weight
-
-    def __lt__(self, other):
-        return self.weight < other.weight
-
-
-def build_huffman_tree(symbols_cnts: dict):
-    # Create leaves of the tree
-    nodes = []
-    for symbol, cnt in symbols_cnts.items():
-        nodes.append((cnt, Node(None, None, cnt, symbol)))
-
-    # Order leaves by weights, heapq is a min-heap
-    heapq.heapify(nodes)
-
-    # Build the tree bottom up
-    while len(nodes) > 1:
-        # Pop the two nodes with the lowest weights
-        left = heapq.heappop(nodes)[1]
-        right = heapq.heappop(nodes)[1]
-
-        new_node = Node(left, right)
-        heapq.heappush(nodes, (new_node.weight, new_node))
-
-    # return the remainging node which is the top node
-    # of the tree
-    return nodes[0][1]
-
-
-def compute_leaves_codes(node: Node, prefix=""):
-    if node.has_both_children():
-        a = compute_leaves_codes(node.left_child, prefix + "0")
-        b = compute_leaves_codes(node.right_child, prefix + "1")
-        return a+b
-    else:
-        assert node.left_child is None and node.right_child is None
-        node.code = prefix
-        return [node]
 
 def gid(node):
     return f"{int(id(node))}"
@@ -134,111 +72,6 @@ def bits_to_represent(nb_values):
     # Discontinuous ! f == 0 in x==1 !
     assert nb_values >= 1
     return math.ceil(math.log2(nb_values))
-
-def code_binary_char(c):
-    return c
-
-def code_ascii_char(c):
-    return f"{ord(c):08b}"
-
-def online_lz_compress(data, code_char, tuples_out=False):
-
-    # The whole point of this trickery is to detect
-    # EOF one char ahead. This way we can tell when
-    # we're processing the last character of the
-    # input file
-
-    EOF_MARK = ''
-    c = data.read(1)  # Read one byte
-    assert c != EOF_MARK, "Compressing empty file is not supported"
-    next_char = data.read(1)
-    eof = next_char == EOF_MARK
-
-    coded_bin = StringIO()
-    prefixes = {"": 0}
-    prefix = ""
-    tuples = ""
-
-    while True:
-        if not eof and prefix + c in prefixes:
-            prefix = prefix + c
-        else:
-            # We have :
-            # - either EOF on next char,
-            # - either prefix+c not in prefixes.
-            # But in both cases we store the (prefix,c). That's
-            # especially useful when EOF is met since it
-            # allows us to terminate the output stream cleanly.
-
-            # Number of bits necessary to represent the length
-            # of the prefixes table.
-            # FIXME this is not really fast.
-            l = bits_to_represent(len(prefixes))
-
-            # Append (prefix's number, c) to the output stream.
-            char = code_char(c)
-
-            #char = f"{ord(c):08b}"
-            if l == 0:
-                pfx = ""
-            else:
-                pfx = f"{np.binary_repr(prefixes[prefix],l)}"
-            coded_bin.write(f"{pfx}{char}")
-
-            if tuples_out:
-                if l == 0:
-                    pfx = ""
-                else:
-                    pfx = f"{np.binary_repr(prefixes[prefix],l)}"
-                tuples += f"({pfx},{char}) "
-
-            # Record the new prefix and give it a number
-            prefixes[prefix + c] = len(prefixes)
-
-            # Prepare for next iteration
-            prefix = ""
-
-        if next_char != EOF_MARK:
-            c = next_char
-            next_char = data.read(1)
-            eof = next_char == EOF_MARK
-        else:
-            break
-
-    if not tuples_out:
-        return coded_bin.getvalue()
-    else:
-        return tuples, coded_bin.getvalue()
-
-
-def decode_binary_char(data, ndx):
-    return data[ndx], 1
-
-def decode_ascii_char(data, ndx):
-    return chr(int(data[ndx:ndx+8], 2)), 8
-
-def online_lz_decompress(coded_bin, decode_char):
-    ndx = 0
-    decoded = StringIO()
-    prefixes = {0: ""}
-    while ndx < len(coded_bin):
-
-        l = bits_to_represent(len(prefixes))
-        if l > 0:
-            prefix_code = int(coded_bin[ndx:ndx+l], 2)
-        else:
-            prefix_code = 0
-
-        char, skips = decode_char(coded_bin, ndx+l)
-
-        decoded.write(prefixes[prefix_code] + char)
-        prefixes[len(prefixes)] = prefixes[prefix_code] + char
-        #ndx = ndx+l+8
-        ndx = ndx+l+skips
-
-    return decoded.getvalue()
-
-
 
 def int32_to_bits(i):
     # We take 32 bits to be safe.
@@ -335,19 +168,6 @@ print(f"Q4: Original string : {S_FIGURE_2}")
 print(f"Q4: encoded string : {LZ77_encoder(S_FIGURE_2, 7)}")
 
 
-def build_codebooks(top_node):
-    # Affect a code to each leaf node
-    d = compute_leaves_codes(top_node, "")
-
-    # Build maps from/to symbol to/from Huffman codes
-    code_map = dict()
-    decode_map = dict()
-    for node in sorted(d, key=lambda n: n.weight):
-        #print(f"{node.symbol} {node.weight:5d} {node.code}")
-        code_map[node.symbol] = node.code
-        decode_map[node.code] = node.symbol
-
-    return code_map, decode_map
 
 
 def codons_iterator(genome):
@@ -549,32 +369,7 @@ print(f"Q9: compression rate (lecture 4, slide 18) : {len(GENOME_TEXT*8)} bits /
 
 
 
-# The following code is to avoid recompressing the genome
-# each time we run the program.
 
-def lz77_cached_compression(sliding_window_size, genome):
-    cache_name=f"LZ77Cache{sliding_window_size}.dat"
-    if not os.path.exists(cache_name):
-        print(f"Crunching with LZ77, sliding window {sliding_window_size}")
-        chrono = datetime.now()
-        tuples = LZ77_encoder(genome, sliding_window_size)
-        print(f"Compression took {datetime.now() - chrono}")
-        assert "".join(LZ77_decoder(tuples)) == genome, "LZ77 compression went wrong"
-        with open(cache_name,"wb") as fout:
-            pickle.dump(tuples, fout)
-    else:
-        with open(cache_name,"rb") as fin:
-            tuples = pickle.load(fin)
-
-    return tuples
-
-def compute_compression_rate_for_LZ77(tuples, sliding_window_size, genome):
-    dl_bits = math.ceil(math.log2(sliding_window_size))
-    char_bits = 8
-    tuple_bits = char_bits+dl_bits
-    compressed_size = len(tuples)*tuple_bits
-    compression_rate = len(genome)*8/compressed_size
-    return compressed_size, compression_rate
 
 
 """ Q10. Encode the genome using the LZ77 algorithm. Give the total
@@ -779,7 +574,7 @@ different values of the sliding window size l. Compare your result
 with the total length and compression rate obtained using the on-line
 Lempel-Ziv algorithm.  Discuss your results. """
 
-for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384, 32768]:
+for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 2**17, 2**18]:
     # LZ77 only
     tuples = lz77_cached_compression(sliding_window_size, GENOME_TEXT)
     compressed_size, compression_rate = compute_compression_rate_for_LZ77(tuples, sliding_window_size, GENOME_TEXT)
@@ -788,7 +583,7 @@ for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384, 32768]:
     bits = lz_with_huffman_encode(sliding_window_size, GENOME_TEXT)
     lz77_huffman_rate = len(GENOME_TEXT)*8 / len(bits)
 
-    print(f"{sliding_window_size} & {compressed_size} & {compression_rate:.2f} & {len(bits)} & {lz77_huffman_rate:.2f}")
+    print(f"{sliding_window_size} & {compressed_size} & {compression_rate:.2f} & {len(bits)} & {lz77_huffman_rate:.2f} \\\\")
 
 exit()
 
