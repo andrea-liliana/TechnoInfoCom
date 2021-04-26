@@ -266,14 +266,14 @@ code. Compare this value with (a) the empirical average length, and
 # Calculate probabilities
 f = sum(codons_cnt.values())
 for key, value in codons_cnt.items():
-    codons_cnt[key] = value/f
+    codons_cnt[key] = round(value/f,5)
 
 prob = []
 for value in codons_cnt.values():
     prob.append(value)
 
 prob = np.array(prob)
-print(prob)
+#print(prob)
 prob = prob.astype(float)
 
 # Calculate the lengths of the Huffman codes
@@ -285,7 +285,14 @@ prob = prob.astype(float)
 l = np.array([len(value) for value in code_map.values()])
 
 expected_average_length = np.sum(prob*l)
-print()
+
+# Get table q5
+from contextlib import redirect_stdout
+with open('Huffman_result.txt', 'w') as f:
+    with redirect_stdout(f):
+        for k in codons_cnt.keys() & code_map.keys():
+            print(k,"&", codons_cnt[k],"&", code_map[k] ,"\\")
+
 print(f"Q6: expected_average_length : {expected_average_length:.2f} bits")
 
 
@@ -296,6 +303,7 @@ entropy = - np.sum(prob*np.log2(prob))
 
 print(f"Q6: entropy of source alphabet is : {entropy:.2f}")
 
+exit()
 
 """ Q7. Plot the evolution of the empirical average length of the
 encoded genome using your Huffman code for increasing input genome
@@ -349,6 +357,8 @@ if not ("skip7" in sys.argv):
     plt.legend()
     plt.savefig("q7.pdf")
     plt.show()
+
+print("q7", empirical_avg_lens)
 
 
 
