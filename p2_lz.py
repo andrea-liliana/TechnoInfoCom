@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from bitarray import bitarray
 
-from p2_LZ77 import LZ77_encoder, LZ77_decoder, compute_compression_rate_for_LZ77,\
-    lz77_cached_compression
+from p2_LZ77 import LZ77_encoder, LZ77_decoder, \
+    compute_compression_rate_for_LZ77, lz77_cached_compression
 from p2_online_lz import *
 from p2_huffman import *
 from p2_utils import *
@@ -30,20 +30,6 @@ def entropy(a):
 # print(entropy([3,2,1]) / math.log2(3))
 # print(entropy([2,1]) / math.log2(2))
 
-def gid(node):
-    return f"{int(id(node))}"
-
-def draw_neato_tree(fout, node):
-
-    if node.has_both_children():
-        fout.write(f"{gid(node)} [label=\"{node.weight:.2f}\"]\n")
-
-        fout.write(f"{gid(node)} -- {gid(node.left_child)} [label=\"0\"]\n")
-        draw_neato_tree(fout, node.left_child)
-        fout.write(f"{gid(node)} -- {gid(node.right_child)} [label=\"1\"]\n")
-        draw_neato_tree(fout, node.right_child)
-    else:
-        fout.write(f"{gid(node)} [label=\"{node.symbol}\\n{node.code}\"]\n")
 
 """ Q1 Implement a function that returns a binary Huffman code for a
 given probability distribution. Give the main steps of your
@@ -56,14 +42,7 @@ ex7_freq = [0.05, 0.10, 0.15, 0.15, 0.2, 0.35]
 symbols = [f"{x:.2f}" for x in ex7_freq]
 top_node = build_huffman_tree(dict(zip(symbols, ex7_freq)))
 leaves = compute_leaves_codes(top_node)
-
-with open("graph.dot", "w") as fout:
-    fout.write("graph HuffmanTree {\n")
-    draw_neato_tree(fout, top_node)
-    r = " ".join([gid(n)+";" for n in leaves])
-    fout.write(f"{{rank = same; {r}}}\n")
-    fout.write("}\n")
-
+node_to_neato("graph.dot", top_node, leaves)
 
 """ Q2. Given a sequence of symbols, implement a function that returns
 a dictionary and the encoded sequence using the on-line Lempel-Ziv

@@ -134,3 +134,26 @@ def decode(compressed, decode_map, nb_symbols = 2**31):
                 break
 
     return file_str.getvalue()
+
+
+def node_to_neato(filepath, top_node, leaves):
+    def gid(node):
+        return f"{int(id(node))}"
+
+    def draw_neato_tree(fout, node):
+        if node.has_both_children():
+            fout.write(f"{gid(node)} [label=\"{node.weight:.2f}\"]\n")
+
+            fout.write(f"{gid(node)} -- {gid(node.left_child)} [label=\"0\"]\n")
+            draw_neato_tree(fout, node.left_child)
+            fout.write(f"{gid(node)} -- {gid(node.right_child)} [label=\"1\"]\n")
+            draw_neato_tree(fout, node.right_child)
+        else:
+            fout.write(f"{gid(node)} [label=\"{node.symbol}\\n{node.code}\"]\n")
+
+    with open(filepath, "w") as fout:
+        fout.write("graph HuffmanTree {\n")
+        draw_neato_tree(fout, top_node)
+        r = " ".join([gid(n)+";" for n in leaves])
+        fout.write(f"{{rank = same; {r}}}\n")
+        fout.write("}\n")
