@@ -468,10 +468,10 @@ expected_average_length = np.sum(prob*l)
 
 # Get table q5
 from contextlib import redirect_stdout
-with open('out.txt', 'w') as f:
+with open('Huffman_result.txt', 'w') as f:
     with redirect_stdout(f):
         for k in codons_cnt.keys() & code_map.keys():
-            print(k,"&", codons_cnt[k],"&", code_map[k] , "\\")
+            print(k,"&", codons_cnt[k],"&", code_map[k] ,"\\")
 
 print(f"Q6: expected_average_length : {expected_average_length:.2f} bits")
 
