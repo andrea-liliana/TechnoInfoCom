@@ -9,9 +9,12 @@ from bitarray import bitarray
 
 from p2_LZ77 import LZ77_encoder, LZ77_decoder, \
     compute_compression_rate_for_LZ77, lz77_cached_compression
-from p2_online_lz import *
-from p2_huffman import *
-from p2_utils import *
+from p2_online_lz import online_lz_compress, online_lz_decompress, \
+    code_ascii_char, decode_ascii_char, code_binary_char, decode_binary_char
+from p2_huffman import build_huffman_tree, build_codebooks, encode, decode, \
+    compute_leaves_codes, node_to_neato, decode_one_symbol
+from p2_utils import bits_to_represent, compress_counts, decompress_counts
+
 
 INPUT_FILE = "genome.txt"
 CODON_LEN = 3
@@ -77,9 +80,11 @@ B/ and determine the corresponding binary Huffman code and the encoded
 genome.  Give the total length of the encoded genome and the
 compression rate. """
 
+
 def codons_iterator(genome):
     for i in range(0, len(genome), CODON_LEN):
         yield genome[i:i+CODON_LEN]
+
 
 codons_cnt = Counter(codons_iterator(GENOME_TEXT))
 CODONS = sorted(codons_cnt.keys())
@@ -105,7 +110,7 @@ code. Compare this value with (a) the empirical average length, and
 # Calculate probabilities
 f = sum(codons_cnt.values())
 for key, value in codons_cnt.items():
-    codons_cnt[key] = round(value/f,5)
+    codons_cnt[key] = round(value/f, 5)
 
 prob = []
 for value in codons_cnt.values():
@@ -185,7 +190,8 @@ if not ("skip7" in sys.argv):
 
     plt.figure()
     plt.plot(x_axis, empirical_avg_lens, label="One Huffman per subgenome")
-    plt.plot(x_axis, empirical_avg_lens_const_huffman, label="One Huffman for all")
+    plt.plot(x_axis, empirical_avg_lens_const_huffman,
+             label="One Huffman for all")
     plt.title("Empirical average length")
     plt.xlabel("Data size (% of the total genome size)")
     plt.ylabel("Bits per codon")
@@ -345,6 +351,7 @@ def lz_with_huffman_encode(sliding_window_size, genome):
 
     return bits
 
+
 bits = lz_with_huffman_encode(WIN_SIZE, GENOME_TEXT)
 print()
 print("Q12: total length of source genome, without spaces : " +
@@ -383,11 +390,14 @@ for i in range(sum(dist_count.values())):
     # won't be more than 100 bits. Ideally we could compute that number
     # based on Huffman trees themselves.
 
-    read_bits, d = decode_one_symbol(bits[total_read_bits:total_read_bits+100], dist_decode_map)
+    read_bits, d = decode_one_symbol(
+        bits[total_read_bits:total_read_bits+100], dist_decode_map)
     total_read_bits += read_bits
-    read_bits, l = decode_one_symbol(bits[total_read_bits:total_read_bits+100], len_decode_map)
+    read_bits, l = decode_one_symbol(
+        bits[total_read_bits:total_read_bits+100], len_decode_map)
     total_read_bits += read_bits
-    read_bits, c = decode_one_symbol(bits[total_read_bits:total_read_bits+100], char_decode_map)
+    read_bits, c = decode_one_symbol(
+        bits[total_read_bits:total_read_bits+100], char_decode_map)
     total_read_bits += read_bits
     dtuples.append((d, l, c))
 
