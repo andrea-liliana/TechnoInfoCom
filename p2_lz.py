@@ -140,8 +140,6 @@ expected_average_length = np.sum(prob*huffman_codes_lens)
 print(f"Q6: expected_average_length : {expected_average_length:.2f} bits")
 print(f"Q6: empirical average length : {len(compressed)} bits / {len(GENOME_TEXT)} symbols = {len(compressed)/(len(GENOME_TEXT)//CODON_LEN):.2f}")
 
-exit()
-
 # Calculate the entropy for the bounds
 entropy = - np.sum(prob*np.log2(prob))
 print(f"Q6: entropy of source alphabet is : {entropy:.2f}")
@@ -424,20 +422,23 @@ different values of the sliding window size l. Compare your result
 with the total length and compression rate obtained using the on-line
 Lempel-Ziv algorithm.  Discuss your results. """
 
-for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384,
-                            32768, 65536, 2**17, 2**18]:
-    # LZ77 only
-    tuples = lz77_cached_compression(sliding_window_size, GENOME_TEXT)
-    compressed_size, compression_rate = compute_compression_rate_for_LZ77(
-        tuples, sliding_window_size, GENOME_TEXT)
+with open("q13.inc","w") as output:
+    for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384,
+                                32768, 65536, 2**17, 2**18]:
+        # LZ77 only
+        tuples = lz77_cached_compression(sliding_window_size, GENOME_TEXT)
+        compressed_size, compression_rate = compute_compression_rate_for_LZ77(
+            tuples, sliding_window_size, GENOME_TEXT)
 
-    # LZ77 + Huffman
-    bits = lz_with_huffman_encode(sliding_window_size, GENOME_TEXT)
-    lz77_huffman_rate = len(GENOME_TEXT)*8 / len(bits)
+        # LZ77 + Huffman
+        bits = lz_with_huffman_encode(sliding_window_size, GENOME_TEXT)
+        lz77_huffman_rate = len(GENOME_TEXT)*8 / len(bits)
 
-    print(f"{sliding_window_size} & {compressed_size} & " +
-          f"{compression_rate:.2f} & {len(bits)} & " +
-          f"{lz77_huffman_rate:.2f} \\\\")
+        txt = f"{sliding_window_size} & {compressed_size} & " + \
+            f"{compression_rate:.2f} & {len(bits)} & " + \
+            f"{lz77_huffman_rate:.2f} \\\\"
+        print(txt)
+        output.write(txt + "\n")
 
 exit()
 
