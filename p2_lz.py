@@ -139,11 +139,23 @@ print(f"Entropy of symbols : {entropy(Counter(GENOME_TEXT).values()):.2f}")
 print(f"Entropy of codons  : {entropy(codons_cnt.values()):.2f}")
 
 prob = np.array(list(marginal_probabilities.values()), dtype=float)
-huffman_codes_lens = np.array([len(value) for value in code_map.values()])
+huffman_codes_lens = np.array([len(code_map[k]) for k in codons_cnt.keys()])
 expected_average_length = np.sum(prob*huffman_codes_lens)
 
-print(f"Q6: expected_average_length : {expected_average_length:.2f} bits")
-print(f"Q6: empirical average length : {len(compressed)} bits / {len(GENOME_TEXT)} symbols = {len(compressed)/(len(GENOME_TEXT)//CODON_LEN):.2f}")
+print("Q6: expected average length : " +
+      f"{expected_average_length:.3f} bits per symbol")
+
+# Here we compute what it would take if we'd store the
+# frequencies table so that a decoder got the complete
+# information to perform the decompression (we do a rough
+# calculation here, it's not bit-exact).
+
+frequencies_length = len(codons_cnt) * bits_to_represent(max(codons_cnt.values()))
+total_compressed_length = frequencies_length + len(compressed)
+
+print("Q6: empirical average length : " +
+      f"{total_compressed_length} bits / {len(GENOME_TEXT) / CODON_LEN:.1f} symbols = " +
+      f"{total_compressed_length/(len(GENOME_TEXT)//CODON_LEN):.3f} bits per symbol")
 
 # Calculate the entropy for the bounds
 entropy = - np.sum(prob*np.log2(prob))
