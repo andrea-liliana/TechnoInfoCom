@@ -6,7 +6,11 @@ from contextlib import redirect_stdout
 
 import numpy as np
 import matplotlib.pyplot as plt
-from bitarray import bitarray
+try:
+    from bitarray import bitarray
+except ModuleNotFoundError as ex:
+    print("Run pip install bitarray !")
+    exit()
 
 from p2_LZ77 import LZ77_encoder, LZ77_decoder, \
     compute_compression_rate_for_LZ77, lz77_cached_compression
@@ -101,6 +105,7 @@ assert GENOME_TEXT == "".join(decode(
     compressed, decode_map)), "Decompressed data is not the same as compressed data"
 
 ratio = (len(GENOME_TEXT)*8) / len(compressed)
+print()
 print(f"Q5: Genome size = {len(GENOME_TEXT)*8} bits; Compressed size = {len(compressed)} bits; ratio={ratio:.2f}")
 
 
@@ -236,15 +241,13 @@ compressed_size, compression_rate = compute_compression_rate_for_LZ77(tuples, WI
 print(f"Q10: total length of encoded genome : {len(tuples)} tuples * {tuple_bits} bits = {compressed_size} bits")
 print(f"Q10: compression rate : {len(GENOME_TEXT)*8} bits / {compressed_size} bits = {len(GENOME_TEXT)*8/compressed_size:.2f} ")
 
+""" 11. Famous data compression algorithms combine the LZ77 algorithm
+and the Huffman algorithm.  Explain how these algorithms can be
+combined and discuss the interest of the possible combinations.  """
 
-"""Q12. Encode the genome using the best (according to your answer in
-the previous question) combination of LZ77 and Huffman
-algorithms. Give the total length of the encoded genome and the
-compression rate."""
-
-small_c = [c for d,l,c in tuples]
-small_l = [l for d,l,c in tuples]
-small_d = [d for d,l,c in tuples]
+small_c = [c for d, l, c in tuples]
+small_l = [l for d, l, c in tuples]
+small_d = [d for d, l, c in tuples]
 
 # FIXME Try this
 #small_c, small_l, small_d = zip(*tuples)
@@ -315,15 +318,20 @@ plt.show()
 
 # --------------------------------------------------------------------
 
-# Compression ************************************************
+"""Q12. Encode the genome using the best (according to your answer in
+the previous question) combination of LZ77 and Huffman
+algorithms. Give the total length of the encoded genome and the
+compression rate."""
 
 def lz_with_huffman_encode(sliding_window_size, genome):
 
     tuples = lz77_cached_compression(sliding_window_size, genome)
 
-    dist_count = Counter([d for d, l, c in tuples])
-    len_count = Counter([l for d, l, c in tuples])
-    char_count = Counter([c for d, l, c in tuples])
+    distances, lengths, chars = zip(*tuples)
+
+    dist_count = Counter(distances)
+    len_count = Counter(lengths)
+    char_count = Counter(chars)
 
     bits = bitarray()
     # print("Counts for distances")
@@ -341,7 +349,7 @@ def lz_with_huffman_encode(sliding_window_size, genome):
     top_node = build_huffman_tree(char_count)
     char_code_map, _ = build_codebooks(top_node)
 
-    for d,l,c in tuples:
+    for d, l, c in tuples:
         # Compress a tuple (d,l,c) into its huffman representation
         # (d -> 0101..., l -> 11000, c->101010), using a different
         # codebook for d,l and c.
@@ -350,6 +358,58 @@ def lz_with_huffman_encode(sliding_window_size, genome):
         bits.extend(bitarray(char_code_map[c]))
 
     return bits
+
+
+def lz_with_huffman_decode(bits):
+
+    total_read_bits = 0
+    read_bits, dist_count = decompress_counts(bits)
+    total_read_bits += read_bits
+    read_bits, len_count = decompress_counts(bits[total_read_bits:])
+    total_read_bits += read_bits
+    read_bits, char_count = decompress_counts(bits[total_read_bits:], as_type='char')
+    total_read_bits += read_bits
+
+    # assert sum(dist_count.values()) == sum(len_count.values()) == \
+    #     sum(char_count.values()) == len(tuples), "Counts deomcpression went bad"
+
+    top_node = build_huffman_tree(dist_count)
+    dist_code_map, dist_decode_map = build_codebooks(top_node)
+    top_node = build_huffman_tree(len_count)
+    len_code_map, len_decode_map = build_codebooks(top_node)
+    top_node = build_huffman_tree(char_count)
+    char_code_map, char_decode_map = build_codebooks(top_node)
+
+    dtuples = []
+    for i in range(sum(dist_count.values())):
+        # total_read_bits+100 : make sure we don't extract all the remaining
+        # of bit array to decode_one_symbol function each time => it's a
+        # speed optimisation. We can do it because we assume Huffman codes
+        # won't be more than 100 bits. Ideally we could compute that number
+        # based on Huffman trees themselves.
+
+        read_bits, d = decode_one_symbol(
+            bits[total_read_bits:total_read_bits+100], dist_decode_map)
+        total_read_bits += read_bits
+        read_bits, l = decode_one_symbol(
+            bits[total_read_bits:total_read_bits+100], len_decode_map)
+        total_read_bits += read_bits
+        read_bits, c = decode_one_symbol(
+            bits[total_read_bits:total_read_bits+100], char_decode_map)
+        total_read_bits += read_bits
+        dtuples.append((d, l, c))
+
+        if len(dtuples) % 10000 == 0:
+            print(len(dtuples))
+
+    print(f"Bits read = {total_read_bits}; decompresseed tuples = {len(dtuples)}")
+
+    # assert len(tuples) == len(dtuples)
+    # for i in range(len(tuples)):
+    #     assert dtuples[i] == tuples[i], \
+    #         f"Decompression failed on tuples {tuples[i]} != {dtuples[i]}"
+
+    return LZ77_decoder(dtuples)
 
 
 bits = lz_with_huffman_encode(WIN_SIZE, GENOME_TEXT)
@@ -362,58 +422,7 @@ rate = len(GENOME_TEXT)*8 / len(bits)
 print(f"Q12: Compression rate : {len(GENOME_TEXT)*8} bits / " +
       f"{len(bits)} bits = {rate:.2f}")
 
-# Decompression ************************************************
-
-total_read_bits = 0
-read_bits, dist_count = decompress_counts(bits)
-total_read_bits += read_bits
-read_bits, len_count = decompress_counts(bits[total_read_bits:])
-total_read_bits += read_bits
-read_bits, char_count = decompress_counts(bits[total_read_bits:], as_type='char')
-total_read_bits += read_bits
-
-assert sum(dist_count.values()) == sum(len_count.values()) == \
-    sum(char_count.values()) == len(tuples), "Counts deomcpression went bad"
-
-top_node = build_huffman_tree(dist_count)
-dist_code_map, dist_decode_map = build_codebooks(top_node)
-top_node = build_huffman_tree(len_count)
-len_code_map, len_decode_map = build_codebooks(top_node)
-top_node = build_huffman_tree(char_count)
-char_code_map, char_decode_map = build_codebooks(top_node)
-
-dtuples = []
-for i in range(sum(dist_count.values())):
-    # total_read_bits+100 : make sure we don't extract all the remaining
-    # of bit array to decode_one_symbol function each time => it's a
-    # speed optimisation. We can do it because we assume Huffman codes
-    # won't be more than 100 bits. Ideally we could compute that number
-    # based on Huffman trees themselves.
-
-    read_bits, d = decode_one_symbol(
-        bits[total_read_bits:total_read_bits+100], dist_decode_map)
-    total_read_bits += read_bits
-    read_bits, l = decode_one_symbol(
-        bits[total_read_bits:total_read_bits+100], len_decode_map)
-    total_read_bits += read_bits
-    read_bits, c = decode_one_symbol(
-        bits[total_read_bits:total_read_bits+100], char_decode_map)
-    total_read_bits += read_bits
-    dtuples.append((d, l, c))
-
-    if len(dtuples) % 10000 == 0:
-        print(len(dtuples))
-
-print(f"Bits read = {total_read_bits}; decompresseed tuples = {len(dtuples)}")
-
-assert len(tuples) == len(dtuples)
-for i in range(len(tuples)):
-    assert dtuples[i] == tuples[i], \
-        f"Decompression failed on tuples {tuples[i]} != {dtuples[i]}"
-
-res = LZ77_decoder(dtuples)
-print(f"LZ77 out : {len(res)} chars; expected {len(GENOME_TEXT)} chars")
-assert "".join(res) == GENOME_TEXT
+assert "".join(lz_with_huffman_decode(bits)) == GENOME_TEXT, "Decompression didn't work"
 
 
 """ Q13. Report the total lengths and compression rates using (a) LZ77
@@ -422,7 +431,7 @@ different values of the sliding window size l. Compare your result
 with the total length and compression rate obtained using the on-line
 Lempel-Ziv algorithm.  Discuss your results. """
 
-with open("q13.inc","w") as output:
+with open("q13.inc", "w") as output:
     for sliding_window_size in [256, 512, 1024, 2048, 4096, 8192, 16384,
                                 32768, 65536, 2**17, 2**18]:
         # LZ77 only
@@ -439,96 +448,3 @@ with open("q13.inc","w") as output:
             f"{lz77_huffman_rate:.2f} \\\\"
         print(txt)
         output.write(txt + "\n")
-
-exit()
-
-
-
-
-"""
-**********************************************************************
-Question 11 :
-**********************************************************************
-11. Famous data compression algorithms combine the LZ77 algorithm and the Huffman algorithm.
-Explain how these algorithms can be combined and discuss the interest of the possible combinations.
-
-A/ Using LZ77 first and Huffman second.
-
-https://stackoverflow.com/questions/55547113/why-to-combine-huffman-and-lz77
-https://cstheory.stackexchange.com/questions/7653/why-does-huffman-coding-eliminate-entropy-that-lempel-ziv-doesnt
-https://www.euccas.me/zlib/
-
-LZ77 is fully deterministic. Sliding window is the only parameter.
-LZ77 produces (distance,length,character) tuples.
-
-Huffman : what input shall we give to huffman ?
-
-First porposal : give it the tuples !
-=> leads good compression about 5.4 bits per CODON.
-BUT the Huffman tree is huge : 100000+ leaves. =>
-the TOTAL compressed size = compressed bits + huffman = is actualy bigger than original file.
-
-(d,l,c) -> [ (d,l), c ]
-
-(d,l,c) -> [d] [l] [c]
-
-950KB to about 280KB
-c = a CODON; NOT a single character
-c = GAT, TAG, CCT, TCA.... NOT c = G, T, C, A
-
-GAT = 3 bytes => 24 bits / per codon
-64 codons => log2 64 = 3 bits / per codon
-
-orignal genome size = 952kb (8 bits/cahracter)
-with codon letters G,T,C,A (2 bits per charcter) instead of char, we shoudl have 952 / 4 = 240kb
-with codon symbols GAT,TCA,ATT,... (6 bits per 3 charcter) instead of char, we shoudl have ((952 / 3)*6)/8 = 238kb
-Stc: 265 kb -> results of 3 steps : change alphabet; LZ77; Huffman.
-gzip : 280 kb
-
-If one assume there is a set of initial symbols, letters for example, then it is possible
-to combine those in bigger symbols if we see repetitions, words for example. Doing, so
-we can build a bigger set of symbols $S$ but, in exchange, represent the initial data with
-a shorter sequence of symbols $R$. That’s what LZ77 does. It builds a better symbol set,
-capturing repetitions. Of course, this makes sense only if we assume that repetitions
-are occuring often enough.
-
-So, once the better set of symbols and the associated sequence of symbols are built,
-one can use Huffman to compress them. Huffman will build an optimal code book for
-representing the symbols given by LZ77.
-
-In practice, the symbols produced by LZ77 are tuples (jump, length, symbol).
-Given how many bits we allow to represent each element,  these symbols may
-be bigger than what they actually represent. So even if repetitions are caught
-by LZ77, we see that the triplets
-
-Given Huffman is parameterless algorithm and leads to an optimal coding, the only variable left is the sliding window
-size of LZ77. The bigger the sliding window, the more repetitions (different repeated strings as well as more occurences) LZ77 can find (so bigger $S$, shorter $R$), but,
-the deeper the Huffman tree. So a balance must be found.
-
-
-B/ Using Huffman first and  LZ77 second.
-
-
-
-
-
----- quest 11, remaining stuff
-
-1/ run LZ77 directly, then compress each tuple the output with Huffman
-
-"famous" algorithm like
-
-MS-XCA : LZ77, then compress tuple with Huffman
-DEFLATE : LZSS (not LZ77!) + canonical Huffman
-
-https://stackoverflow.com/questions/55547113/why-to-combine-huffman-and-lz77
-
-LZ77 est sliding windows mais quid huffman ? => use blocks : cut original file sin blocks
-
-
-
-**********************************************************************
-Question 12 : what does "the best" mean ? The fastest to compress ? decompress ? The one that produces shortest files ?
-**********************************************************************
-
-"""
