@@ -76,9 +76,9 @@ def online_lz_compress(data, code_char, tuples_out=False):
             break
 
     if not tuples_out:
-        return coded_bin.getvalue()
+        return coded_bin.getvalue(), prefixes
     else:
-        return tuples, coded_bin.getvalue()
+        return tuples, coded_bin.getvalue(), prefixes
 
 
 def decode_binary_char(data, ndx):

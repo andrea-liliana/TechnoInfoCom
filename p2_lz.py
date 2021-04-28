@@ -58,10 +58,11 @@ algorithm (see State of the art in data compression, slide
 50/53). Reproduce and report the example given in the course."""
 
 slide_50 = "1 0 11 01 010 00 10".replace(" ", "")
-tuples, compressed = online_lz_compress(StringIO(slide_50), code_binary_char, tuples_out=True)
+tuples, compressed, prefixes = online_lz_compress(StringIO(slide_50), code_binary_char, tuples_out=True)
 assert compressed == "1 00 011 101 1000 0100 0010".replace(" ", "")
 assert online_lz_decompress(compressed, decode_binary_char) == slide_50
 print()
+print(f"Q2: Prefixes dictionary : {prefixes}")
 print(f"Q2: (addr, bit) : {tuples}")
 print(f"Q2: U: {compressed}")
 
