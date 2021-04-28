@@ -3,6 +3,7 @@ import os.path
 import pickle
 from datetime import datetime
 
+
 def LZ77_encoder(input_text, SWSIZE):
     """ Return a list of (distance, length, character) tuples.
     """

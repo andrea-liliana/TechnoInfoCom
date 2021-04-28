@@ -8,64 +8,76 @@ def bin_array(num, m):
 
 class HammingCode:
     def __init__(self, data_bits, code_bits):
-        self.data_bits = data_bits
-        self.code_bits = code_bits
-        self.parity_bits = code_bits - data_bits
+        """ For example for hamming(4,7) : data_bits=4, code_bits=7.
+        """
+        assert code_bits > data_bits, "Not a valid Hamming configuration"
 
-        assert code_bits > data_bits
+        self._data_bits = data_bits
+        self._code_bits = code_bits
+        self._parity_bits = code_bits - data_bits
+
         self._precompute()
 
-    def encode(self, data):
-        assert len(data) == self.data_bits
-        return (data @ self.G) % 2
+    def encode(self, word):
+        """ Encode word acording to the Hamming code.
+        The word is a numpy array of 1 and 0.
+        Return the encoded word as a numpy array of 1 and 0.
+        """
+        return (word @ self.G) % 2
 
-    def decode(self, code):
-        parity_check = (self.H @ code) % 2
+    def decode(self, codeword):
+        # Decode codeword (a numpy array of 0 and ones)
+        # Compute the vector (data, parity) bits of the received codeword.
+        parity_check = (self.H @ codeword) % 2
+
+        # Convert the vector of data+parity bits into a number
+        # and use it to find the correction to apply (if any)
+        # (equivalent to the most likely error given codeword)
         correction = self.correction_map[np.dot(self.POWER2, parity_check)]
-        corrected_code = (code + correction) % 2
-        return corrected_code[0:self.data_bits]
+
+        # Apply the correction (equivalently : undo the error)
+        corrected_code = (codeword + correction) % 2
+        return corrected_code[0:self._data_bits]
 
     def _precompute(self):
+        # Compute useful matrices according to
+        # https://en.wikipedia.org/wiki/Hamming(7,4)
         parities = np.append(
-            np.logical_not(np.eye(self.parity_bits, dtype=int)),
-            np.ones((1, self.parity_bits), dtype=int),
+            np.logical_not(np.eye(self._parity_bits, dtype=int)),
+            np.ones((1, self._parity_bits), dtype=int),
             axis=0)
 
-        self.G = np.append(np.eye(self.data_bits, dtype=int), parities, axis=1)
-        # print("G")
-        # print(self.G)
+        self.G = np.append(np.eye(self._data_bits, dtype=int), parities, axis=1)
 
         self.H = np.append(np.transpose(parities),
-                           np.eye(self.parity_bits, dtype=int), axis=1)
-        print("H")
-        print(self.H)
+                           np.eye(self._parity_bits, dtype=int), axis=1)
 
-        # Now recovering the data
-        self.POWER2 = np.array([2**i for i in range(self.parity_bits)],
+        # Now work out the way to correct the received codewords.
+        self.POWER2 = np.array([2**i for i in range(self._parity_bits)],
                                dtype=int)
 
         self.correction_map = dict()
         mle_map = dict()  # mle : Most Likely Explanation
 
         # Compute all possible errors
-        for i in range(2**self.code_bits):
+        for i in range(2**self._code_bits):
             # See:
             #  https://en.wikipedia.org/wiki/Decoding_methods#Syndrome_decoding
             #  https://en.wikipedia.org/wiki/Hamming(7,4)#Error_correction
 
-            # The error that will be added to the correct data
-            # (for example during transmission)
-            error = bin_array(i, self.code_bits)
+            # Simulate the error that could be added to the correct data
+            # (for example during transmission). A one means error,
+            # a zero means none.
+            error = bin_array(i, self._code_bits)
 
             # Compute the effect of the error on the parity check
             h_e = (self.H @ error) % 2
-            # print(f"{error} -> {h_e}")
 
             # Evaluate the most likely explanation given the error
-            # To o that we compare the parity check value of that
+            # To do that we compare the parity check value of that
             # error with identical values given by other errors.
             # The MLE is the error which has the smallest number of
-            # wrong bits (bit_in_error).
+            # wrong (1) bits (bit_in_error).
 
             ndx = np.dot(self.POWER2, h_e)
             bits_in_error = np.sum(error)
