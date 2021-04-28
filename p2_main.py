@@ -62,7 +62,7 @@ tuples, compressed, prefixes = online_lz_compress(StringIO(slide_50), code_binar
 assert compressed == "1 00 011 101 1000 0100 0010".replace(" ", "")
 assert online_lz_decompress(compressed, decode_binary_char) == slide_50
 print()
-print(f"Q2: Prefixes dictionary : {prefixes}")
+print(f"Q2: (Prefixes -> Addresses) dictionary : {prefixes}")
 print(f"Q2: (addr, bit) : {tuples}")
 print(f"Q2: U: {compressed}")
 

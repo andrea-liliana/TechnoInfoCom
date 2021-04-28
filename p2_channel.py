@@ -11,32 +11,12 @@ RATE, WAV = scipy.io.wavfile.read('sound.wav')
 # sound.wav: RIFF (little-endian) data, WAVE audio, Microsoft PCM, 8 bit, mono 11025 Hz
 # PCM : https://en.wikipedia.org/wiki/Pulse-code_modulation#Modulation
 
-
-# QUESTION 20
-P = 0.01
-def errors(data_bits, code_bits):
-    r = code_bits / data_bits
-    data_len = len(WAV)*7
-    nb_errors = round(P*data_len*r)
-    print(f"Hamming {data_bits}/{code_bits} ")
-    print(f"=> coded signal is {math.ceil(data_len*r)} bits long => {nb_errors} errors")
-    print(f"=> communication rate {1/r:.2f}")
-
-    return data_len*r, nb_errors
-
-len_4_7, nb_err_4_7 = errors(4,7)
-len_11_15, nb_err_11_15 = errors(11,15)
-
-print((11/15)/(4/7))
-print(f"4,7 -> 11,15 : Reduction in size by a factor of {(1/len_4_7) * len_11_15:.2f}")
-print(f"4,7 -> 11,15 : Reduction in errors by a factor of {(1/nb_err_4_7) * nb_err_11_15:.2f}")
-
-exit()
-
 # QUESTION 15
 
 plt.plot(WAV)
 plt.title("Original wave")
+plt.xlabel("Samples indices")
+plt.ylabel("Samples values")
 plt.savefig("q15.pdf")
 
 # QUESTION 16
@@ -50,6 +30,8 @@ unique_elements, counts_elements = np.unique(WAV, return_counts=True)
 plt.figure()
 plt.hist(WAV, bins=256)
 plt.title("Histogram of wave samples values counts")
+plt.xlabel("Samples values")
+plt.ylabel("# occurences")
 plt.savefig("q16.pdf")
 
 mapping = [None] * 256
@@ -100,6 +82,8 @@ print("Q17: Wrote decoded_with_errors.wav")
 plt.figure()
 plt.plot(decoded)
 plt.title("Decoded sound, from noisy channel")
+plt.xlabel("Samples indices")
+plt.ylabel("Samples values")
 plt.savefig("q17.pdf")
 
 # QUESTION 18
@@ -162,4 +146,28 @@ print("Q19: Wrote decoded_corrected.wav")
 plt.figure()
 plt.plot(decoded)
 plt.title("Decoded sound, with error correction, noisy channel")
+plt.xlabel("Samples indices")
+plt.ylabel("Samples values")
 plt.savefig("q19.pdf")
+
+
+# QUESTION 20
+P = 0.01
+def errors(data_bits, code_bits):
+    r = code_bits / data_bits
+    data_len = len(WAV)*7
+    nb_errors = round(P*data_len*r)
+    print(f"Hamming {data_bits}/{code_bits} ")
+    print(f"=> coded signal is {math.ceil(data_len*r)} bits long => {nb_errors} errors")
+    print(f"=> communication rate {1/r:.2f}")
+
+    return data_len*r, nb_errors
+
+len_4_7, nb_err_4_7 = errors(4,7)
+len_11_15, nb_err_11_15 = errors(11,15)
+
+print((11/15)/(4/7))
+print(f"4,7 -> 11,15 : Reduction in size by a factor of {(1/len_4_7) * len_11_15:.2f}")
+print(f"4,7 -> 11,15 : Reduction in errors by a factor of {(1/nb_err_4_7) * nb_err_11_15:.2f}")
+
+exit()
