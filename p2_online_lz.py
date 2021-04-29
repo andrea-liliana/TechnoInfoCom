@@ -8,6 +8,8 @@ def code_binary_char(c):
 
 
 def code_ascii_char(c):
+    # Given an 8 bits character, gives back a binary representation of
+    # it.
     return f"{ord(c):08b}"
 
 
@@ -42,7 +44,6 @@ def online_lz_compress(data, code_char, tuples_out=False):
 
             # Number of bits necessary to represent the length
             # of the prefixes table.
-            # FIXME this is not really fast.
             l = bits_to_represent(len(prefixes))
 
             # Append (prefix's number, c) to the output stream.
@@ -86,6 +87,8 @@ def decode_binary_char(data, ndx):
 
 
 def decode_ascii_char(data, ndx):
+    # print(type(data))
+    # print(len(data[ndx:ndx+8]))
     return chr(int(data[ndx:ndx+8], 2)), 8
 
 

@@ -136,8 +136,8 @@ code. Compare this value with (a) the empirical average length, and
 (b) theoretical bound(s). Justify.  """
 
 
-print(f"Entropy of symbols : {entropy(Counter(GENOME_TEXT).values()):.2f}")
-print(f"Entropy of codons  : {entropy(codons_cnt.values()):.2f}")
+print(f"Q6: Entropy of symbols : {entropy(Counter(GENOME_TEXT).values()):.2f}")
+print(f"Q6: Entropy of codons  : {entropy(codons_cnt.values()):.2f}")
 
 prob = np.array(list(marginal_probabilities.values()), dtype=float)
 huffman_codes_lens = np.array([len(code_map[k]) for k in codons_cnt.keys()])
@@ -215,7 +215,7 @@ if not ("skip7" in sys.argv):
     plt.ylabel("Bits per codon")
     plt.legend()
     plt.savefig("q7.pdf")
-    plt.show()
+    #plt.show()
 
     print("Q7: Empirical Average lengths : ", empirical_avg_lens)
 
@@ -223,7 +223,7 @@ if not ("skip7" in sys.argv):
 """ Q9. Encode the genome using the on-line Lempel-Ziv algorithm. Give
 the total length of the encoded genome and the compression rate."""
 
-coded_bin = online_lz_compress(StringIO(GENOME_TEXT), code_ascii_char)
+coded_bin, _ = online_lz_compress(StringIO(GENOME_TEXT), code_ascii_char)
 decoded = online_lz_decompress(coded_bin, decode_ascii_char)
 assert decoded == GENOME_TEXT, "something went wrong in the compression or decompression"
 
@@ -326,7 +326,7 @@ print(f"1. l + c + d : build_huffman_tree on {len(tuples)} tuples (of which {len
 compressed_size = sum([len(char_code_map[c]) + len(len_code_map[l]) + len(dist_code_map[d]) for d,l,c in tuples]) + all_trees_size
 plt.figure()
 plt.plot(list(sorted(char_count.values())))
-plt.show()
+#plt.show()
 
 
 # --------------------------------------------------------------------

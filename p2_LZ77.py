@@ -83,17 +83,20 @@ def compute_compression_rate_for_LZ77(tuples, sliding_window_size, genome):
 # each time we run the program.
 
 def lz77_cached_compression(sliding_window_size, genome):
-    cache_name=f"LZ77Cache{sliding_window_size}.dat"
+    cache_name = f"LZ77Cache{sliding_window_size}.dat"
     if not os.path.exists(cache_name):
-        print(f"Crunching with LZ77, sliding window {sliding_window_size}")
+        print(f"Crunching with LZ77, sliding window {sliding_window_size}. " +
+              "This can take from 2 minutes from 5 hours depending on " +
+              "sliding window size.")
         chrono = datetime.now()
         tuples = LZ77_encoder(genome, sliding_window_size)
         print(f"Compression took {datetime.now() - chrono}")
-        assert "".join(LZ77_decoder(tuples)) == genome, "LZ77 compression went wrong"
-        with open(cache_name,"wb") as fout:
+        assert "".join(LZ77_decoder(tuples)) == genome, \
+            "LZ77 compression went wrong"
+        with open(cache_name, "wb") as fout:
             pickle.dump(tuples, fout)
     else:
-        with open(cache_name,"rb") as fin:
+        with open(cache_name, "rb") as fin:
             tuples = pickle.load(fin)
 
     return tuples
