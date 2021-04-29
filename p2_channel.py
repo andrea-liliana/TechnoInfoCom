@@ -25,7 +25,7 @@ plt.savefig("q15.pdf")
 are used. So we only need to be able to represent 90 values. For that
 we need log_2 90 = 7 bits """
 
-unique_elements, counts_elements = np.unique(WAV, return_counts=True)
+unique_samples, counts_samples = np.unique(WAV, return_counts=True)
 
 plt.figure()
 plt.hist(WAV, bins=256)
@@ -34,48 +34,65 @@ plt.xlabel("Samples values")
 plt.ylabel("# occurences")
 plt.savefig("q16.pdf")
 
-mapping = [None] * 256
-demapping = [2**7] * 256
+# Now we convert the file into a 7 bits per sample file.
 
-for i, e in enumerate(unique_elements):
-    mapping[e] = bin_array(i, 7)
-    demapping[i] = e
+# First we compute coding/decoding maps.
 
-bin_encoded = np.zeros(7 * len(WAV), dtype=bool)
+print(f"Q16: There are {len(unique_samples)} unique samples")
+code_map = [None] * 2**8
+# Note that in the decoding map, we take the
+# bits that will be flipped into account
+decode_map = list(range(2**7))
+for i, e in enumerate(unique_samples):
+    code_map[e] = bin_array(i, 7)
+    decode_map[i] = e
+
+# We're a bit lazy : we represent bits as a numpy array.
+encoded_as_7bits = np.zeros(7 * len(WAV), dtype=bool)
 for i in range(len(WAV)):
-    bin_encoded[i*7:(i+1)*7] = mapping[WAV[i]]
+    encoded_as_7bits[i*7:(i+1)*7] = code_map[WAV[i]]
 
-print(f"Q16 Encoded sound is {len(bin_encoded)//8} bytes long, " +
+print(f"Q16: Encoded sound is {len(encoded_as_7bits)//8} bytes long, " +
       f"original was {len(WAV)}")
 
 # Make sure we can decode it
-decoded = np.zeros(len(WAV), dtype=np.uint8)
-for i in range(len(WAV)):
-    decoded[i] = demapping[np.dot(bin_encoded[i*7:(i+1)*7],
-                                  np.array([64, 32, 16, 8, 4, 2, 1]))]
+POWERS = np.array([2**(6-i) for i in range(7)])
 
-assert decoded.all() == WAV.all()
+def decode_7bits(data, decode_map):
+    """ Decode a sequence of bits (data) from 7 bits block to 8 bits
+    blocks. The conversion from 7 to 8 bits is given by the
+    decode_map.
+    """
+    decoded = np.zeros(len(data) // 7, dtype=np.uint8)
+    for j, i in enumerate(range(0, len(data), 7)):
+        b = data[i:i+7]
+        decoded[j] = decode_map[np.dot(b, POWERS)]
+    return decoded
+
+decoded = decode_7bits(encoded_as_7bits, decode_map)
+assert decoded.all() == WAV.all(), "coding/decoding failed in some way"
 
 # QUESTION 17
 
-P = 0.01
-bits_to_flip = int(len(bin_encoded)*P)
-print(f"Q17: Generating noise : {int(len(bin_encoded)*P)} bits will " +
-      f"be flipped out of {len(bin_encoded)}")
-indices = random.sample(range(len(bin_encoded)), bits_to_flip)
-assert len(set(indices)) == bits_to_flip, \
-    "Some indices were redundant or not enough indices"
 
-bin_encoded_with_error = bin_encoded.copy()
-for i in indices:
-    bin_encoded_with_error[i] = not bin_encoded_with_error[i]
+def add_noise(data):
+    """Add noise to data, a mutable sequence of bits
 
-decoded = np.zeros(len(WAV), dtype=np.uint8)
-for i in range(len(WAV)):
-    v = np.dot(bin_encoded_with_error[i*7:(i+1)*7],
-               np.array([64, 32, 16, 8, 4, 2, 1]))
-    decoded[i] = demapping[v]
+    The way we flip bits is not exactly a uniform distribution. But
+    it's good enough for the test (on average).
+    """
+    P = 0.01
+    indices = random.sample(range(len(data)), int(len(data)*P))
+    for i in indices:
+        data[i] = not data[i]
 
+
+print(f"Q17: Generating noise")
+encoded_as_7bits_with_error = encoded_as_7bits.copy()
+add_noise(encoded_as_7bits_with_error)
+
+# Simulating the reception (reconstructing the WAV file)
+decoded = decode_7bits(encoded_as_7bits_with_error, decode_map)
 scipy.io.wavfile.write("decoded_with_errors.wav", RATE, decoded)
 print("Q17: Wrote decoded_with_errors.wav")
 
@@ -92,29 +109,24 @@ DATA_BITS = 4
 CODE_BITS = 7
 hamming = HammingCode(DATA_BITS, CODE_BITS)
 
-# bits = bitarray.bitarray()
-# bits.frombytes(bytes(WAV.tolist()))
-
-bits = np.append(bin_encoded, [False] * (DATA_BITS - len(bin_encoded) % DATA_BITS))
+# Simplifying code a bit by padding the data.
+bits = np.append(encoded_as_7bits, [False] * (DATA_BITS - len(encoded_as_7bits) % DATA_BITS))
 assert len(bits) % DATA_BITS == 0, "Padding is necesarry"
 
-hamming_bits = bitarray.bitarray((len(bits)//DATA_BITS)*CODE_BITS)
-
-print(f"Q18: Encoding {len(bits)} bits to {len(hamming_bits)} bits")
+print(f"Q18: Encoding {len(bits)} bits")
+hamming_bits = bitarray.bitarray()
 j = 0
 for i in range(0, len(bits), DATA_BITS):
     data = bits[i:i+DATA_BITS].tolist()
     hcode = hamming.encode(data)
-    hamming_bits[j:j+CODE_BITS] = bitarray.bitarray(list(hcode))
+    hamming_bits.extend(bitarray.bitarray(list(hcode)))
     j += CODE_BITS
+print(f"Q18: Encoded message length is {len(hamming_bits)} bits")
 
 # QUESTION 19
 
-NB_ERRORS = int(len(hamming_bits)*P)
-print(f"Q19: Introducing {NB_ERRORS} errors with probability:{P}")
-indices = random.sample(range(len(hamming_bits)), NB_ERRORS)
-for i in indices:
-    hamming_bits[i] = hamming_bits[i] ^ 1
+print("Q19: Adding noise")
+add_noise(hamming_bits)
 
 print("Q19: Decoding and error-correction")
 decoded_bits = bitarray.bitarray()
@@ -132,13 +144,13 @@ for i in range(len(bits)):
     if bits[i] != decoded_bits[i]:
         error += 1
 
-print(f"Q19: {error} errors on {len(bits)} => {error/len(bits):.3f}")
+print(f"Q19: After Hamming correction, {error} errors left on {len(bits)} bits=> {error/len(bits):.3f}")
 
 decoded = np.zeros(len(WAV), dtype=np.uint8)
 for i in range(len(WAV)):
     v = np.dot(decoded_bits[i*7:(i+1)*7].tolist(),
                np.array([64, 32, 16, 8, 4, 2, 1]))
-    decoded[i] = demapping[v]
+    decoded[i] = decode_map[v]
 
 scipy.io.wavfile.write("decoded_corrected.wav", RATE, decoded)
 print("Q19: Wrote decoded_corrected.wav")
@@ -152,22 +164,24 @@ plt.savefig("q19.pdf")
 
 
 # QUESTION 20
+
+# Here is a notebook of various computations done while investigating
+# question 20.
+
 P = 0.01
 def errors(data_bits, code_bits):
     r = code_bits / data_bits
     data_len = len(WAV)*7
     nb_errors = round(P*data_len*r)
-    print(f"Hamming {data_bits}/{code_bits} ")
-    print(f"=> coded signal is {math.ceil(data_len*r)} bits long => {nb_errors} errors")
-    print(f"=> communication rate {1/r:.2f}")
+    print(f"Q20: Hamming {data_bits}/{code_bits} ")
+    print(f"Q20: => coded signal is {math.ceil(data_len*r)} bits long => {nb_errors} errors")
+    print(f"Q20: => communication rate {1/r:.2f}")
 
     return data_len*r, nb_errors
 
 len_4_7, nb_err_4_7 = errors(4,7)
 len_11_15, nb_err_11_15 = errors(11,15)
 
-print((11/15)/(4/7))
-print(f"4,7 -> 11,15 : Reduction in size by a factor of {(1/len_4_7) * len_11_15:.2f}")
-print(f"4,7 -> 11,15 : Reduction in errors by a factor of {(1/nb_err_4_7) * nb_err_11_15:.2f}")
-
-exit()
+print(f"Q20: {(11/15)/(4/7)}")
+print(f"Q20: 4,7 -> 11,15 : Reduction in size by a factor of {(1/len_4_7) * len_11_15:.2f}")
+print(f"Q20: 4,7 -> 11,15 : Reduction in errors by a factor of {(1/nb_err_4_7) * nb_err_11_15:.2f}")
