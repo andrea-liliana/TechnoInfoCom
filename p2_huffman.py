@@ -28,8 +28,14 @@ class Node:
     def __lt__(self, other):
         return self.weight < other.weight
 
+    def __str__(self):
+        return f"{self.weight} {self.code} Left:{self.left_child is not None} Right:{self.left_child is not None}"
 
 def build_huffman_tree(symbols_cnts: dict):
+    """ symbols_cnts : frequency table or probabilities tables.
+
+    """
+
     # Create leaves of the tree
     nodes = []
     for symbol, cnt in symbols_cnts.items():
@@ -149,7 +155,7 @@ def node_to_neato(filepath, top_node, leaves):
             fout.write(f"{gid(node)} -- {gid(node.right_child)} [label=\"1\"]\n")
             draw_neato_tree(fout, node.right_child)
         else:
-            fout.write(f"{gid(node)} [label=\"{node.symbol}\\n{node.code}\"]\n")
+            fout.write(f"{gid(node)} [label=\"{node.weight}\\n{node.code}\"]\n")
 
     with open(filepath, "w") as fout:
         fout.write("graph HuffmanTree {\n")

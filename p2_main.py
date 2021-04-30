@@ -47,10 +47,13 @@ the second list of exercises, and report the output of your code for
 this example. """
 
 ex7_freq = [0.05, 0.10, 0.15, 0.15, 0.2, 0.35]
-symbols = [f"{x:.2f}" for x in ex7_freq]
+symbols = [f"{i}" for i in range(len(ex7_freq))]
+print(f"Q1: {dict(zip(symbols, ex7_freq))}")
 top_node = build_huffman_tree(dict(zip(symbols, ex7_freq)))
 leaves = compute_leaves_codes(top_node)
+print(f"Q1: {[str(l) for l in leaves]}")
 node_to_neato("graph.dot", top_node, leaves)
+
 
 """ Q2. Given a sequence of symbols, implement a function that returns
 a dictionary and the encoded sequence using the on-line Lempel-Ziv

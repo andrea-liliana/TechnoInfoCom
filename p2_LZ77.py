@@ -29,10 +29,10 @@ def LZ77_encoder(input_text, SWSIZE):
 
         # This range is easy to understand (we just run the sliding
         # windows from left to right) : r = range(i - SWSIZE, i). But
-        # the one we use is trickier, it's because in the TA's example
+        # the one we use is reversed, it's because in the TA's example
         # he goes the other way around (right to left)...
 
-        for pfx_start in range(i-1, i-SWSIZE-1, -1):
+        for pfx_start in reversed(range(i - SWSIZE, i)):
 
             pfx_len = 0
             prefix = ""
@@ -57,9 +57,7 @@ def LZ77_encoder(input_text, SWSIZE):
                 longest_prefix_pos = pfx_start
                 longest_prefix_len = pfx_len
 
-        # We take prefix of length 2 or more else they are
-        # just a regular single symbol and not worht a repetition.
-        if longest_prefix_len > 1:
+        if longest_prefix_len > 0:
             d, l, c = i - longest_prefix_pos, longest_prefix_len, input_text[i + longest_prefix_len]
         else:
             d, l, c = 0, 0, input_text[i]
@@ -79,14 +77,14 @@ def compute_compression_rate_for_LZ77(tuples, sliding_window_size, genome):
     return compressed_size_in_bits, compression_rate
 
 
-# The following code is to avoid recompressing the genome
-# each time we run the program.
-
 def lz77_cached_compression(sliding_window_size, genome):
+    # The following code is to avoid recompressing the genome
+    # each time we run the program.
+
     cache_name = f"LZ77Cache{sliding_window_size}.dat"
     if not os.path.exists(cache_name):
         print(f"Crunching with LZ77, sliding window {sliding_window_size}. " +
-              "This can take from 2 minutes from 5 hours depending on " +
+              "This can take from 2 minutes to 5 hours depending on " +
               "sliding window size.")
         chrono = datetime.now()
         tuples = LZ77_encoder(genome, sliding_window_size)
