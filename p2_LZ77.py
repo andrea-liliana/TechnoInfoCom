@@ -69,6 +69,13 @@ def LZ77_encoder(input_text, SWSIZE):
 
 
 def compute_compression_rate_for_LZ77(tuples, sliding_window_size, genome):
+
+    ds = [d for d,l,c in tuples]
+    dl = [l for d,l,c in tuples]
+    d_bits = math.ceil(math.log2(max(ds)))
+    l_bits = math.ceil(math.log2(max(dl)))
+    print(f"LZ77 : {min(ds)} <= d <= {max(ds)}, {d_bits} bits; {min(dl)} <= l <= {max(dl)}, {l_bits} bits")
+
     dl_bits = math.ceil(math.log2(sliding_window_size))
     char_bits = 8
     tuple_bits = char_bits+2*dl_bits
