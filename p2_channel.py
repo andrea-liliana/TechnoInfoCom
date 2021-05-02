@@ -13,7 +13,7 @@ RATE, WAV = scipy.io.wavfile.read('sound.wav')
 # sound.wav: RIFF (little-endian) data, WAVE audio, Microsoft PCM, 8 bit, mono 11025 Hz
 # PCM : https://en.wikipedia.org/wiki/Pulse-code_modulation#Modulation
 
-# QUESTION 15
+# QUESTION 15 -----------------------------------------------------------------
 
 plt.plot(WAV)
 plt.title("Original wave")
@@ -21,7 +21,7 @@ plt.xlabel("Samples indices")
 plt.ylabel("Samples values")
 plt.savefig("q15.pdf")
 
-# QUESTION 16
+# QUESTION 16 -----------------------------------------------------------------
 
 """ Note that in the data, only 90 values out of the 256 possible ones
 are used. So we only need to be able to represent 90 values. For that
@@ -45,10 +45,6 @@ plt.savefig("q16.pdf")
 # First we compute coding/decoding maps.
 
 print(f"Q16: There are {len(unique_samples)} unique samples")
-code_map = [None] * 2**8
-# Note that in the decoding map, we take the
-# bits that will be flipped into account
-decode_map = list(range(2**7))
 
 # There are 90 sample values. We have 128 possible codes so there are
 # unused codes. We can code the first 38 samples values twice
@@ -67,13 +63,22 @@ for i in range(38):
 for i in range(38, 90):
     values_expander[38*2+i-38] = i
 
+code_map = [None] * 2**8
 for i, e in enumerate(unique_samples):
     ve = values_expander.index(i)
     code_map[e] = bin_array(ve, 7)
 
-decode_map = values_expander
 decode_map = [unique_samples[x] for x in values_expander]
 
+
+# This code is left here as the naive approach to coding.
+# code_map = [None] * 2**8
+# for i, e in enumerate(unique_samples):
+#     code_map[e] = bin_array(i, 7)
+# decode_map = list(unique_samples) + [0]*38
+# print(decode_map)
+
+# Now we encode the data
 # We're a bit lazy : we represent bits as a numpy array.
 encoded_as_7bits = np.zeros(7 * len(WAV), dtype=bool)
 for i in range(len(WAV)):
@@ -101,17 +106,17 @@ assert (decoded == WAV).all(), "coding/decoding failed in some way"
 
 print(f"Q16: {np.count_nonzero(decoded != WAV)} errors found")
 
-# QUESTION 17
-
+# QUESTION 17 -----------------------------------------------------------------
 
 def add_noise(data):
-    """Add noise to data, a mutable sequence of bits
+    """ Add noise to data, a mutable sequence of bits
 
     The way we flip bits is not exactly a uniform distribution. But
     it's good enough for the test (on average).
     """
     P = 0.01
     indices = random.sample(range(len(data)), int(len(data)*P))
+    print(f"     introducing {len(indices)} bit flips")
     for i in indices:
         data[i] = not data[i]
 
@@ -123,7 +128,7 @@ add_noise(encoded_as_7bits_with_error)
 # Simulating the reception (reconstructing the WAV file)
 decoded = decode_7bits(encoded_as_7bits_with_error, decode_map)
 
-print(f"Q17: {np.count_nonzero(decoded != WAV)} errors found")
+print(f"Q17: {np.count_nonzero(decoded != WAV)} corrupted samples found")
 
 scipy.io.wavfile.write("decoded_with_errors.wav", RATE, decoded)
 print("Q17: Wrote decoded_with_errors.wav")
@@ -135,7 +140,7 @@ plt.xlabel("Samples indices")
 plt.ylabel("Samples values")
 plt.savefig("q17.pdf")
 
-# QUESTION 18
+# QUESTION 18 -----------------------------------------------------------------
 
 DATA_BITS = 4
 CODE_BITS = 7
@@ -171,18 +176,15 @@ assert len(bits) == len(decoded_bits),\
     "The decoded data has not the same length as the original data!" + \
     f" {len(decoded_bits)} != {len(bits)}"
 
-error = 0
-for i in range(len(bits)):
-    if bits[i] != decoded_bits[i]:
-        error += 1
-
-print(f"Q19: After Hamming correction, {error} errors left on {len(bits)} bits=> {error/len(bits):.3f}")
 
 decoded = np.zeros(len(WAV), dtype=np.uint8)
 for i in range(len(WAV)):
     v = np.dot(decoded_bits[i*7:(i+1)*7].tolist(),
                np.array([64, 32, 16, 8, 4, 2, 1]))
     decoded[i] = decode_map[v]
+
+error = np.count_nonzero(decoded != WAV)
+print(f"Q19: After Hamming correction, {error} errors left on {len(WAV)} samples => {error/len(WAV):.4f}")
 
 scipy.io.wavfile.write("decoded_corrected.wav", RATE, decoded)
 print("Q19: Wrote decoded_corrected.wav")
@@ -195,7 +197,7 @@ plt.ylabel("Samples values")
 plt.savefig("q19.pdf")
 
 
-# QUESTION 20
+# QUESTION 20 -----------------------------------------------------------------
 
 # Here is a notebook of various computations done while investigating
 # question 20.

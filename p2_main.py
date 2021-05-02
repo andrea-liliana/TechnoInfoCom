@@ -261,6 +261,10 @@ print(f"Q10: compression rate : {len(GENOME_TEXT)*8} bits / {compressed_size} bi
 and the Huffman algorithm.  Explain how these algorithms can be
 combined and discuss the interest of the possible combinations.  """
 
+""" What follows are the remnants of various computations we made
+to check if our compression scheme (3 Huffman trees) was worth it.
+"""
+
 small_c = [c for d, l, c in tuples]
 small_l = [l for d, l, c in tuples]
 small_d = [d for d, l, c in tuples]
