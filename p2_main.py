@@ -257,7 +257,7 @@ compressed_size, compression_rate = compute_compression_rate_for_LZ77(tuples, WI
 print(f"Q10: total length of encoded genome : {len(tuples)} tuples * {tuple_bits} bits = {compressed_size} bits")
 print(f"Q10: compression rate : {len(GENOME_TEXT)*8} bits / {compressed_size} bits = {len(GENOME_TEXT)*8/compressed_size:.2f} ")
 
-""" 11. Famous data compression algorithms combine the LZ77 algorithm
+""" Q11. Famous data compression algorithms combine the LZ77 algorithm
 and the Huffman algorithm.  Explain how these algorithms can be
 combined and discuss the interest of the possible combinations.  """
 
